@@ -106,7 +106,7 @@ class Desk(models.Model):
         """
         Set is_booked/booked_by based on bookings active at moment 'now'
         """
-        current = self.bookings.filter(
+        current = self.bookings.filter( # type: ignore
             start_time__lte=now(),
             end_time__gte=now()
         ).select_related('user').first()
@@ -147,7 +147,7 @@ class Booking(models.Model):
 
         if self.desk.is_permanent and self.desk.permanent_assignee != self.user:
             raise ValidationError({
-                'desk': f'This desk is permanently assigned to {self.desk.permanent_assignee.username}. Only they can book it.'
+                'desk': f'This desk is permanently assigned to {self.desk.permanent_assignee.username}. Only they can book it.' # type: ignore
             })
 
         overlapping = Booking.objects.filter(
@@ -164,5 +164,3 @@ class Booking(models.Model):
     def save(self,*args, **kwargs):
         self.full_clean()
         super().save(*args, **kwargs)
-
-# Create your models here.

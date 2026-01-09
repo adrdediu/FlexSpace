@@ -1,3 +1,127 @@
-from django.contrib import admin
+from typing import Any
+from django.contrib import admin, messages
+from django.http import HttpRequest
+from .models import Country, Location, Floor, Room, Desk, Booking
+from django.utils.html import format_html
+from django.core.exceptions import ValidationError
+
+# --- Inline admin ---
+
+class LocationInline(admin.TabularInline):
+    model = Location
+    extra = 1
+
+class FloorInline(admin.TabularInline):
+    model = Floor
+    extra = 1
+
+class RoomInline(admin.TabularInline):
+    model = Room
+    extra = 1
+
+class DeskInline(admin.TabularInline):
+    model = Desk
+    extra = 1
+# --- Parent Admins with Inlines ---
+
+@admin.register(Country)
+class CountryAdmin(admin.ModelAdmin):
+    list_display = ('id', 'name')
+    search_fields = ('name',)
+    inlines = [LocationInline]
+
+@admin.register(Location)
+class LocationAdmin(admin.ModelAdmin):
+    list_display = ('id','name','country')
+    list_filter = ('country',)
+    search_fields = ('name','country__name')
+    inlines = [FloorInline]
+
+@admin.register(Floor)
+class FloorAdmin(admin.ModelAdmin):
+    list_display = ('id','name','location')
+    list_filter = ('location',)
+    search_fields = ('name','location__name')
+    inlines = [RoomInline]
+
+@admin.register(Room)
+class RoomAdmin(admin.ModelAdmin):
+    list_display = ('name','floor','map_image')
+    list_filter = ('floor',)
+    search_fields = ('name','floor__name','floor__location__name')
+    inlines = [DeskInline]
+
+@admin.register(Desk)
+class DeskAdmin(admin.ModelAdmin):
+    list_display = ['name','room','permanent_status','orientation','is_locked']
+    list_filter = ['room','is_permanent','orientation','is_locked']
+    search_fields = ['name','permanent_assignee__username','room__name']
+    autocomplete_fields = ['permanent_assignee','locked_by']
+
+    fieldsets = (
+        ('Basic Information', {
+            'fields':('room','name','pos_x','pos_y','orientation')
+        }),
+        ('Permanent Assignment', {
+            'fields': ('is_permanent', 'permanent_assignee')
+        }),
+        ('Booked',{
+            'fields': ('is_booked','booked_by'),
+            'classes': ('collapse',)
+        }),
+        ('Locking', {
+            'fields': ('is_locked','locked_by'),
+            'classes': ('collapse',)
+        }),
+    )
+
+    def permanent_status(self, obj):
+        """ Display permanent status with color"""
+        if obj.is_permanent:
+            return format_html(
+                '<span style="color:#8b5cf6; font-weight: bold;">Ok {}</span>',
+                obj.permanent_assignee.username if obj.permanent_assignee else 'No Assignee'
+            )
+        return format_html('<span style="color:#6b7280;">-</span')
+    permanent_status.short_description = 'Permanent Assignment' # type: ignore
+
+    def get_readonly_fields(self, request, obj=None):
+        """ Staff can only edit permanent fields"""
+        if request.user.is_superuser:
+            return []
+        
+        return ['room','name','pos_x','pos_y','orientation','is_locked','locked_by','is_booked','booked_by']
+    
+    def has_add_permission(self, request: HttpRequest) -> bool:
+        """ Only superusers can add desks """
+        return request.user.is_superuser
+    
+    def has_delete_permission(self,request,obj=None):
+        """ Only superusers can delete desks """
+        return request.user.is_superuser
+    
+@admin.register(Booking)
+class BookingAdmin(admin.ModelAdmin):
+    list_display = ['user','desk','start_time','end_time','is_permanent_desk']
+    list_filter = ['desk__is_permanent','start_time','desk__room']
+    search_fields = ['user__username','desk__name']
+    autocomplete_fields = ['user','desk']
+    date_hierarchy = 'start_time'
+
+    def is_permanent_desk(self,obj):
+        """ Show if booking is for permanent desk"""
+        if obj.desk.is_permanent:
+            return format_html('<span style="color: #8B5CF6;">OK Permanent</span>')
+        return '-'
+    is_permanent_desk.short_description = 'Desk Type' # type: ignore
+
+    def save_model(self,request, obj, form, change):
+        """ Validate before saving"""
+        try:
+            obj.full_clean()
+            super().save_model(request, obj, form, change)
+        except ValidationError as e:
+            messages.error(request, str(e))
+
 
 # Register your models here.
