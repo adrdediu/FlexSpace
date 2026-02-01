@@ -22,6 +22,6 @@ class LoginTokenObtainPairSerializer(TokenObtainPairSerializer):
             "is_superuser": self.user.is_superuser,
             "role": "Superuser" if self.user.is_superuser else ("Staff" if self.user.is_staff else "User"),
             "groups": [group.name for group in self.user.groups.all()],
-        })
+        }) # type: ignore
 
         return data
