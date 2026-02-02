@@ -4,11 +4,11 @@ import {BrowserRouter, Routes, Route, Navigate} from 'react-router-dom';
 import {FluentProvider, Nav, Spinner, makeStyles} from '@fluentui/react-components';
 import {AuthProvider, useAuth} from './contexts/AuthContext';
 import {ThemeProvider, useTheme} from './contexts/ThemeContext';
-import {ToastProvider} from './context/ToastContext';
+import {ToastProvider} from './contexts/ToastContext';
 import {FloatingThemeToggle} from './components/FloatingThemeToggle';
 import Login from './components/Login';
 import Home from './components/Home';
-import GlobalLayout from './components/GloabalLayout';
+import GlobalLayout from './components/GlobalLayout';
 
 const useStyles = makeStyles({
   appContainer: {

@@ -59,4 +59,39 @@ export const lightTheme: Theme = {
 
 export const darkTheme: Theme = {
     ...createDarkTheme(blueBrandRamp),
+    colorNeutralBackground1: '#1a1a1a',
+    colorNeutralBackground2: '#242424',
+    colorNeutralBackground3: '#2e2e2e',
+    colorNeutralBackground4: '#383838',
+    colorNeutralForeground1: '#FFFFFF',
+    colorNeutralForeground2: '#d6d6d6',
+    colorNeutralForeground3: '#adadad',
+    colorBrandForeground1: blueBrandRamp[110],
+    colorBrandBackground2: blueBrandRamp[120],
+    greenBackground: '#0d331a',
+    greenBackgroundHover: '#144d27',
+    greenBackgroundPressed: '#1a6634',
+    greenForeground: '#00ff82',
+    greenForegroundHover: '#1aff8f',
+    greenForegroundPressed: '#33ff9c',
+
+    colorCompoundBrandBackground: '#0078d4',
+    colorCompoundBrandBackgroundHover: '#1a85db',
+    colorCompoundBrandBackgroundPressed: '#0066ff',
+    
+    colorPaletteBlueForeground1: blueBrandRamp[110],
+    colorPaletteBlueForeground2: blueBrandRamp[120],
+    colorPaletteGreenBackground3: '#00e675',
+    colorPaletteGreenForeground1: '#00ff82',
+    colorPaletteGreenForeground2: '#1aff8f',
+};
+
+export const myLightTheme = {
+    ...webLightTheme,
+    ...lightTheme
+};
+
+export const myDarkTheme = {
+    ...webDarkTheme,
+    ...darkTheme
 }
