@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="/vite.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>FlexSpace</title>
+    <style>
+      :root {
+        --bg-dark: #1a1a1a;
+        --text-dark:#ffffff;
+        --spinner-dark:#7b5cff;
+
+        --bg-light:#ffffff;
+        --text-light:#242424;
+        --spinner-light:#ff4208;
+      }
+
+      html, #root {
+        height:100%;
+        width:100%;
+        margin:0;
+        padding:0;
+        background-color: var(--bg-dark);
+        font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif
+      }
+      
+      #initial-loader {
+        position:fixed;
+        inset:0;
+        z-index:1000;
+        display:flex;
+        flex-direction: column;
+        align-items:center;
+        justify-content: center;
+        background-color: var(--bg-dark);
+        transition: opacity 0.5s ease-in-out;
+      }
+
+      .fluent-spinner{
+        position:relative;
+        width:32px;
+        height:32px;
+      }
+
+      .fluent-spinner-circle{
+        position:absolute;
+        width:100%;
+        height:100%;
+        border-radius:50%;
+        border: 3px solid rgba(255,255,255,0.2);
+        border-top-color:var(--spinner-dark);
+        animation: fluent-spin 1.3s cubic-bezier(0.53,0.21,0.29,0.67) infinite;
+      }
+
+      @keyframes fluent-spin {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+
+      .loader-label {
+        margin-top:16px;
+        color:var(--text-dark);
+        text-align:center;
+        pointer-events: auto;
+        box-sizing: border-box;
+        font-family:var(--fontFamilyBase);
+        font-size:var(--fontSizeBase400);
+        line-height: var(--lineHeightBase400);
+        font-weight:600;
+      }
+      
+      .light-theme {
+        background-color: var(--bg-light);
+      }
+      
+      .light-theme #initial-loader {
+        background-color: var(--bg-light);
+      }
+
+      .light-theme .fluent-spinner-circle {
+        border-color:rgba(0,0,0,0.1);
+        border-top-color: var(--spinner-light);
+      }
+
+      .light-theme .loader-label {
+        color: var(--text-light);
+      }
+    </style>
+    <script>
+      (function() {
+        try {
+          const savedTheme = localStorage.getItem('theme');
+          if(savedTheme ==='light'){
+            document.documentElement.classList.add('light-theme');
+          } else {
+            document.documentElement.classList.remove('light-theme');
+          }
+        }catch (e) {
+          console.error('Error accessing localStorage:',e);
+        }
+      })();
+    </script>
+    <link rel="modulepreload" href="/src/main.tsx" as="script" />
+  </head>
+  <body>
+    <div id="root">
+      <div id="initial-loader">
+        <div class="fluent-spinner">
+          <div class="fluent-spinner-circle"></div>
+        </div>
+        <div class="loader-label">Initializing FlexSpace</div>
+      </div>
+    </div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>
