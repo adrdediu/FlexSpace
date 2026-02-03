@@ -22,7 +22,7 @@ export default defineConfig({
       },
       '/ws': {
         target: 'ws://localhost:8000',
-        ws: true,
+        ws: false,
       },
       '/static': {
         target: 'http://localhost:8000',

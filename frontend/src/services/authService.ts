@@ -36,7 +36,7 @@ class AuthService {
 
     async login(username: string, password: string): Promise<LoginResponse> {
         try {
-            const response = await fetch('/auth/login', {
+            const response = await fetch('/auth/login/', {
                 method: 'POST',
                 headers: {
                     'Content-Type':'application/json',
@@ -92,7 +92,7 @@ class AuthService {
 
     async refreshToken(): Promise<boolean> {
         try {
-            const response = await fetch('/auth/token/refresh', {
+            const response = await fetch('/auth/token/refresh/', {
                 method:'POST',
                 credentials: 'include',
             });

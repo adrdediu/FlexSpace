@@ -8,7 +8,7 @@ import {ToastProvider} from './contexts/ToastContext';
 import {FloatingThemeToggle} from './components/FloatingThemeToggle';
 import Login from './components/Login';
 import Home from './components/Home';
-import GlobalLayout from './components/GlobalLayout';
+import GlobalLayout from './components/Layout/GlobalLayout';
 
 const useStyles = makeStyles({
   appContainer: {
@@ -165,7 +165,7 @@ const AppRoutesWithAuth: React.FC = () => {
       <GlobalLayout
         ref={globeLayoutRef}
         isAuthenticated={isAuthenticated}
-        thememode={themeMode}
+        themeMode={themeMode}
         onGlobeReady={handleGlobeReady}
       >
         <Routes>
