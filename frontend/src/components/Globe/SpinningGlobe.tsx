@@ -290,7 +290,7 @@ const SpinningGlobe = forwardRef<SpinningGlobeRef, SpinningGlobeProps> (({
                 const pointsData = generateLocationPointsData();
 
                 globeRef.current
-                    .pointData(pointsData)
+                    .pointsData(pointsData)
                     .pointColor('color')
                     .pointAltitude(0.01)
                     .pointRadius('size')

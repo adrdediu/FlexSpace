@@ -1,10 +1,9 @@
-
 import React, {useCallback, useEffect, useState, useRef} from 'react';
 import { useNavigate } from 'react-router-dom';
 import { makeStyles } from '@fluentui/react-components';
 import { useAuth } from '../contexts/AuthContext';
 import websocketService from '../services/websocketService';
-//import { TopBar } from './TopBar';
+import { TopBar } from './TopBar';
 import { StatusBar } from './StatusBar';
 import { type WsStatus, type NavSection } from '../types/common';
 //import Dashboard from './Dashboard/DashboardUI';
@@ -193,12 +192,12 @@ const Home: React.FC<HomeProps> = ({ onMount }) => {
 
   return (
     <div className={styles.container}>
-      {/* <TopBar
+      <TopBar
         activeSection={activeSection}
         onSectionChange={handleSectionChange}
         loading={loading}
         onLogout={handleLogout}
-      /> */}
+      />
 
       <div className={styles.mainContent}>
         {/* {activeSection === 'dashboard' && (

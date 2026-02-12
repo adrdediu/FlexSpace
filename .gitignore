@@ -218,3 +218,4 @@ __pycache__/
 local_settings.py
 media/
 backend/booking/migrations
+docs/
