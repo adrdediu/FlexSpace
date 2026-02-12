@@ -13,18 +13,55 @@ class Country(models.Model):
         return self.name
     
 
+class UserGroup(models.Model):
+    """
+    User groups for location-based access control.
+    Created by Location Managers to organize users within a location.
+    """
+    name = models.CharField(max_length=100)
+    description = models.TextField(blank=True)
+    location = models.ForeignKey('Location', on_delete=models.CASCADE, related_name='user_groups')
+    members = models.ManyToManyField(User, related_name='location_groups', blank=True)
+    created_by = models.ForeignKey(User, on_delete=models.SET_NULL, null=True, related_name='created_groups')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        unique_together = ('name', 'location')
+        ordering = ['location', 'name']
+
+    def __str__(self):
+        return f"{self.name} ({self.location.name})"
+
+
 class Location(models.Model):
     name = models.CharField(max_length=100)
     country = models.ForeignKey(Country, on_delete=models.CASCADE, related_name="locations")
     lat = models.FloatField(null=True, blank=True)
     lng = models.FloatField(null=True, blank=True)
     country_code = models.CharField(max_length=2, null=True, blank=True)
+    
+    # Management fields
+    location_managers = models.ManyToManyField(
+        User,
+        related_name='managed_locations',
+        blank=True,
+        help_text='Users who can manage this location'
+    )
+    allow_room_managers_to_add_group_members = models.BooleanField(
+        default=False,
+        help_text='Allow room managers to add members to user groups'
+    )
 
     class Meta:
         unique_together = ('name', 'country')
     
     def __str__(self):
         return f"{self.name} - {self.country.name}"
+    
+    def is_location_manager(self, user):
+        """Check if user is a location manager"""
+        return self.location_managers.filter(id=user.id).exists() or user.is_superuser
     
 class Floor(models.Model):
     name = models.CharField(max_length=50)
@@ -40,13 +77,52 @@ class Floor(models.Model):
 class Room(models.Model):
     name = models.CharField(max_length=100)
     floor = models.ForeignKey(Floor, on_delete=models.CASCADE, related_name="rooms")
+    description = models.TextField(blank=True, help_text='Room description and details')
     map_image = models.ImageField(upload_to='room_maps/', blank=True, null=True)
+    
+    # Management fields
+    room_managers = models.ManyToManyField(
+        User,
+        related_name='managed_rooms',
+        blank=True,
+        help_text='Users who can manage this room'
+    )
+    
+    # Access control
+    allowed_groups = models.ManyToManyField(
+        UserGroup,
+        related_name='accessible_rooms',
+        blank=True,
+        help_text='User groups that can book desks in this room'
+    )
 
     class Meta:
         unique_together = ('name', 'floor')
 
     def __str__(self):
         return f"{self.name} - {self.floor.name}"
+    
+    def is_room_manager(self, user):
+        """Check if user is a room manager or location manager"""
+        if user.is_superuser:
+            return True
+        if self.room_managers.filter(id=user.id).exists():
+            return True
+        # Location managers have room manager privileges
+        return self.floor.location.is_location_manager(user)
+    
+    def can_user_book(self, user):
+        """Check if user can book desks in this room"""
+        if user.is_superuser or user.is_staff:
+            return True
+        
+        # Check if user is in any allowed group
+        if self.allowed_groups.exists():
+            user_groups = user.location_groups.filter(location=self.floor.location)
+            return self.allowed_groups.filter(id__in=user_groups.values_list('id', flat=True)).exists()
+        
+        # If no groups set, allow all users
+        return True
     
 class Desk(models.Model):
     name = models.CharField(max_length=100)
