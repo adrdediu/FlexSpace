@@ -1,5 +1,5 @@
 import React from 'react';
-import {Text,makeStyles, tokens} from '@fluentui/react-components';
+import {Text,makeStyles, tokens, mergeClasses} from '@fluentui/react-components';
 import {
     CheckmarkCircleRegular,
     ErrorCircleRegular,
@@ -76,7 +76,7 @@ export const StatusBar: React.FC<StatusBarProps> =({status,lastPing}) => {
 
     return(
         <div className={styles.statusBar}>
-            <div className={`${styles.connectionStatus} ${styles[status]}`}>
+            <div className={mergeClasses(styles.connectionStatus, styles[status])}>
                 {getStatusIcon(status)}
                 <Text>{getStatusText(status)}</Text>
             </div>

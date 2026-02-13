@@ -17,6 +17,7 @@ import {
   DrawerHeader,
   DrawerHeaderTitle,
   DrawerBody,
+  mergeClasses,
 } from '@fluentui/react-components';
 import {
   Home24Regular,
@@ -226,6 +227,7 @@ interface TopBarProps {
   loading?: boolean;
   onLogout: () => void;
   onSettingsClick?: () => void;
+  onProfileClick?: () => void;
 }
 
 export const TopBar: React.FC<TopBarProps> = ({
@@ -234,6 +236,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   loading = false,
   onLogout,
   onSettingsClick,
+  onProfileClick,
 }) => {
   const styles = useStyles();
   const { user } = useAuth();
@@ -309,7 +312,6 @@ export const TopBar: React.FC<TopBarProps> = ({
             </div>
             <div className={styles.logoText}>
               <span className={styles.logoTextContent}>FlexSpace</span>
-              <span className={styles.logoSubtext}>Desk Booking</span>
             </div>
           </div>
 
@@ -321,9 +323,10 @@ export const TopBar: React.FC<TopBarProps> = ({
                 icon={<Home24Regular />}
                 onClick={() => handleNavClick('dashboard')}
                 disabled={loading}
-                className={`${styles.navButton} ${
-                  activeSection === 'dashboard' ? styles.navButtonActive : ''
-                }`}
+                className={mergeClasses(
+                  styles.navButton,
+                  activeSection === 'dashboard' && styles.navButtonActive
+                )}
               >
                 Dashboard
               </Button>
@@ -335,9 +338,10 @@ export const TopBar: React.FC<TopBarProps> = ({
                 icon={<CalendarLtr24Regular />}
                 onClick={() => handleNavClick('bookings')}
                 disabled={loading}
-                className={`${styles.navButton} ${
-                  activeSection === 'bookings' ? styles.navButtonActive : ''
-                }`}
+                className={mergeClasses(
+                  styles.navButton,
+                  activeSection === 'bookings' && styles.navButtonActive
+                )}
               >
                 My Bookings
               </Button>
@@ -350,9 +354,10 @@ export const TopBar: React.FC<TopBarProps> = ({
                   icon={<Shield24Regular />}
                   onClick={() => handleNavClick('admin')}
                   disabled={loading}
-                  className={`${styles.navButton} ${
-                    activeSection === 'admin' ? styles.navButtonActive : ''
-                  }`}
+                  className={mergeClasses(
+                    styles.navButton,
+                    activeSection === 'admin' && styles.navButtonActive
+                  )}
                 >
                   Admin
                   {user?.is_superuser && (
@@ -456,7 +461,11 @@ export const TopBar: React.FC<TopBarProps> = ({
                 <MenuItem
                   icon={<Person24Regular />}
                   className={styles.menuItem}
-                  onClick={() => console.log('Profile clicked')}
+                  onClick={() => {
+                    if (onProfileClick) {
+                      onProfileClick();
+                    }
+                  }}
                 >
                   View Profile
                 </MenuItem>
@@ -597,7 +606,9 @@ export const TopBar: React.FC<TopBarProps> = ({
               appearance="subtle"
               icon={<Person24Regular />}
               onClick={() => {
-                console.log('Profile clicked');
+                if (onProfileClick) {
+                  onProfileClick();
+                }
                 setMobileMenuOpen(false);
               }}
               className={styles.drawerNavButton}
