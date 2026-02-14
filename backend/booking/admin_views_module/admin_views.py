@@ -41,6 +41,41 @@ class LocationManagementViewSet(viewsets.ModelViewSet):
         # Return locations where user is a location manager
         return user.managed_locations.all()
     
+    def create(self, request, *args, **kwargs):
+        """
+        Create a new location - Only superusers can create new locations
+        """
+        if not request.user.is_superuser:
+            return Response(
+                {'error': 'Only superusers can create new locations'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        
+        # Create the location
+        location = serializer.save()
+        
+        # Automatically add the creator as a location manager
+        location.location_managers.add(request.user)
+        
+        # Return the updated location with manager info
+        output_serializer = LocationSerializer(location, context={'request': request})
+        return Response(output_serializer.data, status=status.HTTP_201_CREATED)
+    
+    def destroy(self, request, *args, **kwargs):
+        """
+        Delete a location - Only superusers can delete locations
+        """
+        if not request.user.is_superuser:
+            return Response(
+                {'error': 'Only superusers can delete locations'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        
+        return super().destroy(request, *args, **kwargs)
+    
     @action(detail=True, methods=['post'])
     def add_managers(self, request, pk=None):
         """

@@ -1,6 +1,6 @@
 from .floor import FloorSerializer
 from .country import CountrySerializer
-from ..models import Location
+from ..models import Location, Country
 from rest_framework import serializers
 from django.contrib.auth.models import User
 
@@ -20,6 +20,13 @@ class LocationManagerSerializer(serializers.ModelSerializer):
 
 class LocationSerializer(serializers.ModelSerializer):
     country = CountrySerializer(read_only=True)
+    country_id = serializers.PrimaryKeyRelatedField(
+        queryset=Country.objects.all(),
+        source='country',
+        write_only=True,
+        required=True
+    )
+    country_name = serializers.CharField(source='country.name', read_only=True)
     floors = FloorSerializer(many=True, read_only=True)
     location_managers = LocationManagerSerializer(many=True, read_only=True)
     location_manager_ids = serializers.PrimaryKeyRelatedField(
@@ -31,14 +38,16 @@ class LocationSerializer(serializers.ModelSerializer):
     )
     is_manager = serializers.SerializerMethodField()
     user_group_count = serializers.SerializerMethodField()
+    floor_count = serializers.SerializerMethodField()
+    room_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Location
         fields = [
-            'id', 'name', 'country', 'lat', 'lng', 'country_code',
+            'id', 'name', 'country', 'country_id', 'country_name', 'lat', 'lng', 'country_code',
             'floors', 'location_managers', 'location_manager_ids',
             'allow_room_managers_to_add_group_members',
-            'is_manager', 'user_group_count'
+            'is_manager', 'user_group_count', 'floor_count', 'room_count'
         ]
         read_only_fields = ['id']
     
@@ -52,6 +61,15 @@ class LocationSerializer(serializers.ModelSerializer):
     def get_user_group_count(self, obj):
         """Get count of user groups in this location"""
         return obj.user_groups.count()
+    
+    def get_floor_count(self, obj):
+        """Get count of floors in this location"""
+        return obj.floors.count()
+    
+    def get_room_count(self, obj):
+        """Get count of rooms across all floors in this location"""
+        from ..models import Room
+        return Room.objects.filter(floor__location=obj).count()
 
 
 class LocationListSerializer(serializers.ModelSerializer):

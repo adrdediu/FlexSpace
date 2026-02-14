@@ -184,6 +184,7 @@ const useStyles = makeStyles({
     flex: 1,
     overflow: 'auto',
     padding: tokens.spacingVerticalL,
+    minHeight: '200px',
   },
   panelBodyNoPadding: {
     padding: 0,

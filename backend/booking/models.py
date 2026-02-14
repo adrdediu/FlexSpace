@@ -196,9 +196,9 @@ class Desk(models.Model):
         ordering = ['room','name']
         constraints = [
             models.CheckConstraint(
-                check=models.Q(is_permanent=False) | models.Q(permanent_assignee__isnull=False),
-                name='permanent_desk_must_have_assignee'
-                )
+                condition=models.Q(is_permanent=False) | models.Q(permanent_assignee__isnull=False),
+                name="permanent_desk_must_have_assignee",
+            )
         ]
 
     def __str__(self):

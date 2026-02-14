@@ -7,6 +7,9 @@ interface UserInfo {
     email: string;
     is_staff: boolean;
     is_superuser: boolean;
+    is_location_manager?: boolean;
+    is_room_manager?: boolean;
+    is_any_manager?: boolean;
     role: string;
     groups: string[];
 }
@@ -19,6 +22,9 @@ interface LoginResponse {
     email: string;
     is_staff: boolean;
     is_superuser: boolean;
+    is_location_manager?: boolean;
+    is_room_manager?: boolean;
+    is_any_manager?: boolean;
     role: string;
     groups: string[];
 }
@@ -31,6 +37,9 @@ class AuthService {
     private isAuthenticatedFlag: boolean = false;
     private is_staff: boolean = false;
     private is_superuser: boolean = false;
+    private is_location_manager: boolean = false;
+    private is_room_manager: boolean = false;
+    private is_any_manager: boolean = false;
     private role: string = "";
     private groups: string[] = [];
 
@@ -73,6 +82,9 @@ class AuthService {
             this.email = null;
             this.is_staff = false;
             this.is_superuser = false;
+            this.is_location_manager = false;
+            this.is_room_manager = false;
+            this.is_any_manager = false;
             this.role = "";
             this.groups = [];
             this.isAuthenticatedFlag = false;
@@ -147,6 +159,9 @@ class AuthService {
             this.last_name = data.last_name;
             this.is_staff = data.is_staff;
             this.is_superuser = data.is_superuser;
+            this.is_location_manager = data.is_location_manager || false;
+            this.is_room_manager = data.is_room_manager || false;
+            this.is_any_manager = data.is_any_manager || false;
             this.role = data.role;
             this.groups = data.groups;
             this.isAuthenticatedFlag = true;
@@ -180,6 +195,9 @@ class AuthService {
             email: this.email,
             is_staff: this.is_staff,
             is_superuser: this.is_superuser,
+            is_location_manager: this.is_location_manager,
+            is_room_manager: this.is_room_manager,
+            is_any_manager: this.is_any_manager,
             role: this.role,
             groups: this.groups,
         };

@@ -4,6 +4,7 @@ from django.conf.urls.static import static
 from .views import CookieTokenRefreshView,DeskViewSet,BookingViewSet,MeView,UserLoginView,UserLogoutView
 from django.urls import path,include
 from .views import CountryViewSet, LocationViewSet, FloorViewSet, RoomViewSet, DeskViewSet, BookingViewSet
+from .admin_views_module import UserGroupViewSet, LocationManagementViewSet, RoomManagementViewSet, UserSearchViewSet
 
 router = routers.DefaultRouter()
 router.register(r'countries', CountryViewSet)
@@ -12,6 +13,12 @@ router.register(r'floors',FloorViewSet)
 router.register(r'rooms',RoomViewSet)
 router.register(r'desks',DeskViewSet)
 router.register(r'bookings',BookingViewSet)
+
+# Admin routes
+router.register(r'usergroups', UserGroupViewSet, basename='usergroup')
+router.register(r'admin/locations', LocationManagementViewSet, basename='admin-location')
+router.register(r'admin/rooms', RoomManagementViewSet, basename='admin-room')
+router.register(r'users', UserSearchViewSet, basename='user')
 
 urlpatterns = [
     path('auth/login/', UserLoginView.as_view(), name='login'),

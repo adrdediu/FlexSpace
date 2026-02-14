@@ -8,6 +8,9 @@ interface UserInfo {
     email: string;
     is_staff: boolean;
     is_superuser: boolean;
+    is_location_manager: boolean;
+    is_room_manager: boolean;
+    is_any_manager: boolean;
     role: string;
     groups: string[];
 }
@@ -55,6 +58,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({children}) => {
                         email: userProfile.email,
                         is_staff: userProfile.is_staff,
                         is_superuser: userProfile.is_superuser,
+                        is_location_manager: userProfile.is_location_manager || false,
+                        is_room_manager: userProfile.is_room_manager || false,
+                        is_any_manager: userProfile.is_any_manager || false,
                         role: userProfile.role,
                         groups: userProfile.groups
                     });
@@ -163,6 +169,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({children}) => {
                 email: data.email,
                 is_staff: data.is_staff,
                 is_superuser: data.is_superuser,
+                is_location_manager: data.is_location_manager || false,
+                is_room_manager: data.is_room_manager || false,
+                is_any_manager: data.is_any_manager || false,
                 role: data.role,
                 groups: data.groups
             });

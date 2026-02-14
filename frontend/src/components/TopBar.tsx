@@ -263,11 +263,13 @@ export const TopBar: React.FC<TopBarProps> = ({
     if (!user) return '';
     if (user.is_superuser) return 'Super Admin';
     if (user.is_staff) return 'Staff';
+    if (user.is_location_manager) return 'Location Manager';
+    if (user.is_room_manager) return 'Room Manager';
     if (user.role) return user.role;
     return 'User';
   };
 
-  const isAdmin = user?.is_staff || user?.is_superuser;
+  const isAdmin = user?.is_staff || user?.is_superuser || user?.is_any_manager;
 
   const handleNavClick = (section: NavSection) => {
     if (!loading) {
@@ -312,6 +314,7 @@ export const TopBar: React.FC<TopBarProps> = ({
             </div>
             <div className={styles.logoText}>
               <span className={styles.logoTextContent}>FlexSpace</span>
+              <span className={styles.logoSubtext}>Desk Booking</span>
             </div>
           </div>
 

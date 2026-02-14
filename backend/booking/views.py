@@ -814,6 +814,11 @@ class MeView(APIView):
 
     def get(self, request):
         user = request.user
+        
+        # Check if user is a location manager or room manager
+        is_location_manager = user.managed_locations.exists()
+        is_room_manager = user.managed_rooms.exists()
+        is_any_manager = is_location_manager or is_room_manager
 
         return Response({
             "username": user.username,
@@ -822,6 +827,9 @@ class MeView(APIView):
             "email": user.email,
             "is_staff": user.is_staff,
             "is_superuser": user.is_superuser,
+            "is_location_manager": is_location_manager,
+            "is_room_manager": is_room_manager,
+            "is_any_manager": is_any_manager,
             "role": "Superuser" if user.is_superuser else ("Staff" if user.is_staff else "User"),
             "groups": [group.name for group in user.groups.all()],
         })

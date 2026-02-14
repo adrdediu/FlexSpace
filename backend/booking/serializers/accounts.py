@@ -12,6 +12,11 @@ class LoginTokenObtainPairSerializer(TokenObtainPairSerializer):
         attrs["username"] = username
 
         data = super().validate(attrs)
+        
+        # Check if user is a location manager or room manager
+        is_location_manager = self.user.managed_locations.exists()
+        is_room_manager = self.user.managed_rooms.exists()
+        is_any_manager = is_location_manager or is_room_manager
 
         data.update({
             "username": self.user.username,
@@ -20,6 +25,9 @@ class LoginTokenObtainPairSerializer(TokenObtainPairSerializer):
             "email": self.user.email,
             "is_staff": self.user.is_staff,
             "is_superuser": self.user.is_superuser,
+            "is_location_manager": is_location_manager,
+            "is_room_manager": is_room_manager,
+            "is_any_manager": is_any_manager,
             "role": "Superuser" if self.user.is_superuser else ("Staff" if self.user.is_staff else "User"),
             "groups": [group.name for group in self.user.groups.all()],
         }) # type: ignore

@@ -7,6 +7,7 @@ import { TopBar } from './TopBar';
 import { StatusBar } from './StatusBar';
 import { FloatingPanelGrid, FloatingPanel, ContentGrid, Card, Section } from './Layout';
 import { SettingsDialog, ProfileDialog } from './Common';
+import { AdminDashboard } from './Admin';
 import { type WsStatus, type NavSection } from '../types/common';
 import { type Desk, type Room } from './Dashboard/types';
 
@@ -360,85 +361,7 @@ const Home: React.FC<HomeProps> = ({ onMount }) => {
   );
 
   const renderAdmin = () => (
-    <FloatingPanelGrid>
-      {/* Overview Stats */}
-      <FloatingPanel
-        title="System Overview"
-        position="top-left"
-        size="large"
-        opacity="glass"
-      >
-        <ContentGrid columns="2" gap="m">
-          <Card variant="filled" noPadding>
-            <div style={{ padding: '16px', textAlign: 'center' }}>
-              <div className={styles.statValue}>156</div>
-              <div className={styles.statLabel}>Users</div>
-            </div>
-          </Card>
-          <Card variant="filled" noPadding>
-            <div style={{ padding: '16px', textAlign: 'center' }}>
-              <div className={styles.statValue}>8</div>
-              <div className={styles.statLabel}>Locations</div>
-            </div>
-          </Card>
-          <Card variant="filled" noPadding>
-            <div style={{ padding: '16px', textAlign: 'center' }}>
-              <div className={styles.statValue}>42</div>
-              <div className={styles.statLabel}>Rooms</div>
-            </div>
-          </Card>
-          <Card variant="filled" noPadding>
-            <div style={{ padding: '16px', textAlign: 'center' }}>
-              <div className={styles.statValue}>328</div>
-              <div className={styles.statLabel}>Desks</div>
-            </div>
-          </Card>
-        </ContentGrid>
-      </FloatingPanel>
-
-      {/* Managed Locations */}
-      <FloatingPanel
-        title="Managed Locations"
-        position="bottom-left"
-        size="xl"
-        opacity="glass"
-        actions={<Button appearance="primary">Add Location</Button>}
-      >
-        <ContentGrid columns="2" gap="m">
-          <Card
-            title="San Francisco Office"
-            subtitle="8 user groups • 12 rooms"
-            variant="outlined"
-            actions={<Button appearance="subtle" size="small">Manage</Button>}
-          >
-            <Text size={200}>You are a Location Manager</Text>
-          </Card>
-          <Card
-            title="London Office"
-            subtitle="5 user groups • 8 rooms"
-            variant="outlined"
-            actions={<Button appearance="subtle" size="small">Manage</Button>}
-          >
-            <Text size={200}>You are a Location Manager</Text>
-          </Card>
-        </ContentGrid>
-      </FloatingPanel>
-
-      {/* Quick Actions */}
-      <FloatingPanel
-        title="Quick Actions"
-        position="top-right"
-        size="small"
-        opacity="glass"
-      >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          <Button style={{ width: '100%' }}>Create Group</Button>
-          <Button style={{ width: '100%' }}>Add Room</Button>
-          <Button style={{ width: '100%' }}>Permissions</Button>
-          <Button appearance="subtle" style={{ width: '100%' }}>Reports</Button>
-        </div>
-      </FloatingPanel>
-    </FloatingPanelGrid>
+    <AdminDashboard />
   );
 
   return (
