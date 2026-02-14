@@ -1,8 +1,8 @@
-
 import React, {useEffect, useRef, useState, useCallback} from 'react';
 import {BrowserRouter, Routes, Route, Navigate} from 'react-router-dom';
 import {FluentProvider, Nav, Spinner, makeStyles} from '@fluentui/react-components';
 import {AuthProvider, useAuth} from './contexts/AuthContext';
+import {PreferencesProvider} from './contexts/PreferencesContext';
 import {ThemeProvider, useTheme} from './contexts/ThemeContext';
 import {ToastProvider} from './contexts/ToastContext';
 import {FloatingThemeToggle} from './components/FloatingThemeToggle';
@@ -48,10 +48,12 @@ const ThemedApp: React.FC = () => {
       <div className={styles.appContainer}>
         <BrowserRouter>
           <AuthProvider>
-            <ToastProvider>
-              <AppRoutesWithAuth />
-              <FloatingThemeToggle />
-            </ToastProvider>
+            <PreferencesProvider>
+              <ToastProvider>
+                <AppRoutesWithAuth />
+                <FloatingThemeToggle />
+              </ToastProvider>
+            </PreferencesProvider>
           </AuthProvider>
         </BrowserRouter>
       </div>

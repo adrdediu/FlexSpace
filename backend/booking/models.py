@@ -3,6 +3,9 @@ from django.contrib.auth.models import User
 from django.utils.timezone import now
 from django.core.exceptions import ValidationError
 
+# Import UserPreferences model
+from .models_preferences import UserPreferences
+
 class Country(models.Model):
     name = models.CharField(max_length=100, unique=True)
     country_code = models.CharField(max_length=2, null=True, blank=True)

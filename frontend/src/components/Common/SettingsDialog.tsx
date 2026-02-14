@@ -22,6 +22,7 @@ import {
 } from '@fluentui/react-icons';
 import { Modal } from '../Common/Modal';
 import { useAuth } from '../../contexts/AuthContext';
+import { usePreferences } from '../../contexts/PreferencesContext';
 
 const useStyles = makeStyles({
   tabsContainer: {
@@ -114,6 +115,7 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
 }) => {
   const styles = useStyles();
   const { user } = useAuth();
+  const { preferences, updatePreferences: savePreferences } = usePreferences();
   const [activeTab, setActiveTab] = useState<SettingsTab>(initialTab);
   const [isSaving, setIsSaving] = useState(false);
 
@@ -232,14 +234,20 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
       <div className={styles.section}>
         <h3 className={styles.sectionTitle}>Appearance</h3>
         <Field label="Theme">
-          <Select defaultValue="auto">
+          <Select 
+            value={preferences?.theme || 'auto'}
+            onChange={(e) => savePreferences({ theme: e.target.value as any })}
+          >
             <option value="light">Light</option>
             <option value="dark">Dark</option>
             <option value="auto">Auto (System)</option>
           </Select>
         </Field>
         <Field label="Language">
-          <Select defaultValue="en">
+          <Select 
+            value={preferences?.language || 'en'}
+            onChange={(e) => savePreferences({ language: e.target.value as any })}
+          >
             <option value="en">English</option>
             <option value="es">Español</option>
             <option value="fr">Français</option>
@@ -252,23 +260,33 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
       <div className={styles.section}>
         <h3 className={styles.sectionTitle}>Regional Settings</h3>
         <Field label="Time Zone">
-          <Select defaultValue="utc">
-            <option value="utc">UTC</option>
-            <option value="est">Eastern Time (US & Canada)</option>
-            <option value="pst">Pacific Time (US & Canada)</option>
-            <option value="gmt">London</option>
-            <option value="cet">Central European Time</option>
+          <Select 
+            value={preferences?.timezone || 'UTC'}
+            onChange={(e) => savePreferences({ timezone: e.target.value })}
+          >
+            <option value="UTC">UTC</option>
+            <option value="America/New_York">Eastern Time (US & Canada)</option>
+            <option value="America/Los_Angeles">Pacific Time (US & Canada)</option>
+            <option value="Europe/London">London</option>
+            <option value="Europe/Paris">Central European Time</option>
+            <option value="Asia/Tokyo">Tokyo</option>
           </Select>
         </Field>
         <Field label="Date Format">
-          <Select defaultValue="mdy">
+          <Select 
+            value={preferences?.date_format || 'mdy'}
+            onChange={(e) => savePreferences({ date_format: e.target.value as any })}
+          >
             <option value="mdy">MM/DD/YYYY</option>
             <option value="dmy">DD/MM/YYYY</option>
             <option value="ymd">YYYY-MM-DD</option>
           </Select>
         </Field>
         <Field label="Time Format">
-          <Select defaultValue="12">
+          <Select 
+            value={preferences?.time_format || '12'}
+            onChange={(e) => savePreferences({ time_format: e.target.value as any })}
+          >
             <option value="12">12-hour (3:30 PM)</option>
             <option value="24">24-hour (15:30)</option>
           </Select>
@@ -279,15 +297,22 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
       <div className={styles.section}>
         <h3 className={styles.sectionTitle}>Booking Defaults</h3>
         <Field label="Default Location">
-          <Select defaultValue="">
+          <Select 
+            value={String(preferences?.default_location || '')}
+            onChange={(e) => savePreferences({ default_location: e.target.value ? Number(e.target.value) : null })}
+          >
             <option value="">No default</option>
+            {/* TODO: Fetch locations from API */}
             <option value="1">San Francisco Office</option>
             <option value="2">London Office</option>
             <option value="3">Tokyo Office</option>
           </Select>
         </Field>
         <Field label="Default Booking Duration">
-          <Select defaultValue="8">
+          <Select 
+            value={String(preferences?.default_booking_duration || 8)}
+            onChange={(e) => savePreferences({ default_booking_duration: Number(e.target.value) })}
+          >
             <option value="1">1 hour</option>
             <option value="2">2 hours</option>
             <option value="4">4 hours</option>
@@ -410,7 +435,7 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
       onClose={onClose}
       title="Settings"
       subtitle="Manage your account settings and preferences"
-      size="medium"
+      size="large"
       noPadding
       actions={[
         {

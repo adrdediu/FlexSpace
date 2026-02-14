@@ -1,9 +1,18 @@
 from typing import Any
 from django.contrib import admin, messages
+from django.contrib.auth import get_user_model
 from django.http import HttpRequest
+from .models import UserPreferences
+
+from .models_preferences import UserPreferences
 from .models import Country, Location, Floor, Room, Desk, Booking
 from django.utils.html import format_html
 from django.core.exceptions import ValidationError
+
+
+User = get_user_model()
+
+
 
 # --- Inline admin ---
 
@@ -125,3 +134,82 @@ class BookingAdmin(admin.ModelAdmin):
 
 
 # Register your models here.
+
+
+# =======================
+# UserPreferences Admin
+# =======================
+@admin.register(UserPreferences)
+class UserPreferencesAdmin(admin.ModelAdmin):
+    list_display = (
+        "user",
+        "theme",
+        "language",
+        "timezone",
+        "default_location",
+        "default_booking_duration",
+        "updated_at",
+    )
+
+    list_filter = (
+        "theme",
+        "language",
+        "timezone",
+        "date_format",
+        "time_format",
+    )
+
+    search_fields = (
+        "user__username",
+        "user__email",
+    )
+
+    autocomplete_fields = ("user", "default_location")
+
+    readonly_fields = ("created_at", "updated_at")
+
+    fieldsets = (
+        ("User", {
+            "fields": ("user",)
+        }),
+
+        ("Appearance", {
+            "fields": ("theme", "language")
+        }),
+
+        ("Regional Settings", {
+            "fields": ("timezone", "date_format", "time_format")
+        }),
+
+        ("Booking Defaults", {
+            "fields": ("default_location", "default_booking_duration")
+        }),
+
+        ("Timestamps", {
+            "fields": ("created_at", "updated_at")
+        }),
+    )
+
+
+# =======================
+# Inline inside User admin
+# =======================
+class UserPreferencesInline(admin.StackedInline):
+    model = UserPreferences
+    can_delete = False
+    extra = 0
+    autocomplete_fields = ("default_location",)
+    readonly_fields = ("created_at", "updated_at")
+
+
+# Extend default User admin
+from django.contrib.auth.admin import UserAdmin as BaseUserAdmin
+
+
+class CustomUserAdmin(BaseUserAdmin):
+    inlines = [UserPreferencesInline]
+
+
+# Re-register User with inline
+admin.site.unregister(User)
+admin.site.register(User, CustomUserAdmin)
