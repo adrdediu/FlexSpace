@@ -106,21 +106,21 @@ const SpinningGlobe = forwardRef<SpinningGlobeRef, SpinningGlobeProps> (({
         externalFocusRef.current = isFocused;
     },[isFocused]);
 
-    const {themeMode} = useTheme();
+    const {effectiveMode} = useTheme();
 
     const [colors, setColors] = useState<ThemeColors>(() => 
-        getThemeColors(themeMode, fillOpacity)
+        getThemeColors(effectiveMode, fillOpacity)
     );
 
     const getLabelColor = (override?: string, mode?: string) =>
-        override ??((mode ?? themeMode) === 'dark' ? '#FFFFFF': '#111111');
+        override ??((mode ?? effectiveMode) === 'dark' ? '#FFFFFF': '#111111');
 
     const [arcsData, setArcsData] = useState<ArcData[]>(
         showArcs ? generateArcsData(arcCount): []
     );
 
     const currentExtended = useRef(extended);
-    const currentThemeMode = useRef(themeMode);
+    const currentThemeMode = useRef(effectiveMode);
     const isAnimating = useRef(false);
     const userInteracting = useRef(false);
 
@@ -543,7 +543,7 @@ const SpinningGlobe = forwardRef<SpinningGlobeRef, SpinningGlobeProps> (({
     }), []);
 
     useEffect(() => {
-        const newColors = getThemeColors(themeMode, fillOpacity);
+        const newColors = getThemeColors(effectiveMode, fillOpacity);
         setColors(newColors);
 
         if(globeRef.current) {
@@ -593,16 +593,16 @@ const SpinningGlobe = forwardRef<SpinningGlobeRef, SpinningGlobeProps> (({
         }
         if(sceneRef.current.pointLight) {
             sceneRef.current.pointLight.color.set(
-                themeMode === 'dark'? 0x4827AF: 0xff4208
+                effectiveMode === 'dark'? 0x4827AF: 0xff4208
             );
         }
         if(sceneRef.current.tooltip) {
             sceneRef.current.tooltip.style.background =
-                themeMode ==='dark'
+                effectiveMode ==='dark'
                 ? 'rgba(72,39, 175, 0.8)'
                 : 'rgba(255, 66, 8, 0.8)';
         }
-    }, [themeMode, fillOpacity, highlightedCountries, labelColor]);
+    }, [effectiveMode, fillOpacity, highlightedCountries, labelColor]);
 
     useEffect(() => {
         const next = showArcs ? generateArcsData(arcCount): [];
@@ -689,7 +689,7 @@ const SpinningGlobe = forwardRef<SpinningGlobeRef, SpinningGlobeProps> (({
         controls.maxDistance = 300;
         sceneRef.current.controls = controls;
 
-        const lights = setupLighting(scene, themeMode);
+        const lights = setupLighting(scene, effectiveMode);
         sceneRef.current.pointLight = lights.pointLight;
 
         const stars = showStars ? createStarfield(scene): null;
@@ -788,7 +788,7 @@ const SpinningGlobe = forwardRef<SpinningGlobeRef, SpinningGlobeProps> (({
                     onReady();
                 }
             });
-        const tooltip = createTooltip(container, themeMode);
+        const tooltip = createTooltip(container, effectiveMode);
         sceneRef.current.tooltip = tooltip;
 
         const mouse = new THREE.Vector2();
