@@ -1,5 +1,6 @@
 import React, { createContext, useState, useEffect, useContext, type ReactNode } from 'react';
 import { useAuth } from './AuthContext';
+import { useTheme } from './ThemeContext';
 
 export interface UserPreferences {
   theme: 'light' | 'dark' | 'auto';
@@ -18,6 +19,7 @@ interface PreferencesContextType {
   updatePreferences: (updates: Partial<UserPreferences>) => Promise<void>;
   formatDate: (date: Date) => string;
   formatTime: (date: Date) => string;
+  getTimezoneAbbreviation: (date: Date) => string;
 }
 
 const PreferencesContext = createContext<PreferencesContextType | null>(null);
@@ -36,6 +38,7 @@ const defaultPreferences: UserPreferences = {
 
 export const PreferencesProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const { authenticatedFetch, user } = useAuth();
+  const { setTheme } = useTheme();
   const [preferences, setPreferences] = useState<UserPreferences | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -48,12 +51,12 @@ export const PreferencesProvider: React.FC<{ children: ReactNode }> = ({ childre
     }
   }, [user]);
 
-  // Apply theme when preferences change
+  // Sync theme with ThemeContext when preferences change
   useEffect(() => {
-    if (preferences) {
-      applyTheme(preferences.theme);
+    if (preferences?.theme) {
+      setTheme(preferences.theme);
     }
-  }, [preferences?.theme]);
+  }, [preferences?.theme, setTheme]);
 
   const fetchPreferences = async () => {
     try {
@@ -88,48 +91,73 @@ export const PreferencesProvider: React.FC<{ children: ReactNode }> = ({ childre
     }
   };
 
-  const applyTheme = (theme: 'light' | 'dark' | 'auto') => {
-    const root = document.documentElement;
-    
-    if (theme === 'auto') {
-      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
-      root.setAttribute('data-theme', prefersDark ? 'dark' : 'light');
-    } else {
-      root.setAttribute('data-theme', theme);
-    }
-  };
-
   const formatDate = (date: Date): string => {
     if (!preferences) return date.toLocaleDateString();
 
-    const year = date.getFullYear();
-    const month = String(date.getMonth() + 1).padStart(2, '0');
-    const day = String(date.getDate()).padStart(2, '0');
+    try {
+      // Convert to user's timezone
+      const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: preferences.timezone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      });
 
-    switch (preferences.date_format) {
-      case 'mdy':
-        return `${month}/${day}/${year}`;
-      case 'dmy':
-        return `${day}/${month}/${year}`;
-      case 'ymd':
-        return `${year}-${month}-${day}`;
-      default:
-        return date.toLocaleDateString();
+      const parts = formatter.formatToParts(date);
+      const year = parts.find(p => p.type === 'year')?.value || '';
+      const month = parts.find(p => p.type === 'month')?.value || '';
+      const day = parts.find(p => p.type === 'day')?.value || '';
+
+      switch (preferences.date_format) {
+        case 'mdy':
+          return `${month}/${day}/${year}`;
+        case 'dmy':
+          return `${day}/${month}/${year}`;
+        case 'ymd':
+          return `${year}-${month}-${day}`;
+        default:
+          return date.toLocaleDateString();
+      }
+    } catch (error) {
+      console.error('Error formatting date:', error);
+      return date.toLocaleDateString();
     }
   };
 
   const formatTime = (date: Date): string => {
     if (!preferences) return date.toLocaleTimeString();
 
-    const hours = date.getHours();
-    const minutes = String(date.getMinutes()).padStart(2, '0');
+    try {
+      // Convert to user's timezone
+      const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: preferences.timezone,
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: preferences.time_format === '12',
+      });
 
-    if (preferences.time_format === '24') {
-      return `${String(hours).padStart(2, '0')}:${minutes}`;
-    } else {
-      const period = hours >= 12 ? 'PM' : 'AM';
-      const displayHours = hours % 12 || 12;
-      return `${displayHours}:${minutes} ${period}`;
+      return formatter.format(date);
+    } catch (error) {
+      console.error('Error formatting time:', error);
+      return date.toLocaleTimeString();
+    }
+  };
+
+  const getTimezoneAbbreviation = (date: Date): string => {
+    if (!preferences) return '';
+
+    try {
+      const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: preferences.timezone,
+        timeZoneName: 'short',
+      });
+
+      const parts = formatter.formatToParts(date);
+      const timeZonePart = parts.find(p => p.type === 'timeZoneName');
+      return timeZonePart?.value || '';
+    } catch (error) {
+      console.error('Error getting timezone:', error);
+      return '';
     }
   };
 
@@ -141,6 +169,7 @@ export const PreferencesProvider: React.FC<{ children: ReactNode }> = ({ childre
         updatePreferences,
         formatDate,
         formatTime,
+        getTimezoneAbbreviation,
       }}
     >
       {children}

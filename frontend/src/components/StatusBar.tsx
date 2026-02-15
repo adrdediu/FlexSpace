@@ -1,12 +1,14 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import {Text,makeStyles, tokens, mergeClasses} from '@fluentui/react-components';
 import {
     CheckmarkCircleRegular,
     ErrorCircleRegular,
     ArrowSyncRegular,
-    DismissRegular
+    DismissRegular,
+    Clock20Regular
 } from '@fluentui/react-icons';
 import {type WsStatus} from '../types/common';
+import { usePreferences } from '../contexts/PreferencesContext';
 
 const useStyles = makeStyles({
     statusBar: {
@@ -45,6 +47,18 @@ const useStyles = makeStyles({
         backgroundColor: 'rgba(232, 134, 0, 0.1)',
         color: tokens.colorPaletteDarkOrangeForeground3,
     },
+    currentTime: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: '6px',
+        fontSize: '12px',
+        color: tokens.colorNeutralForeground2,
+    },
+    divider: {
+        width: '1px',
+        height: '16px',
+        backgroundColor: tokens.colorNeutralStroke2,
+    },
 });
 
 interface StatusBarProps {
@@ -54,6 +68,17 @@ interface StatusBarProps {
 
 export const StatusBar: React.FC<StatusBarProps> =({status,lastPing}) => {
     const styles = useStyles();
+    const { formatTime, formatDate, getTimezoneAbbreviation } = usePreferences();
+    const [currentTime, setCurrentTime] = useState(new Date());
+
+    // Update current time every second
+    useEffect(() => {
+        const timer = setInterval(() => {
+            setCurrentTime(new Date());
+        }, 1000);
+
+        return () => clearInterval(timer);
+    }, []);
 
     const getStatusIcon = (status: WsStatus) => {
         switch(status) {
@@ -74,17 +99,33 @@ export const StatusBar: React.FC<StatusBarProps> =({status,lastPing}) => {
         return "Status Type Error";
     };
 
+    const timezoneAbbr = getTimezoneAbbreviation(currentTime);
+
     return(
         <div className={styles.statusBar}>
+            {/* Current Time */}
+            <div className={styles.currentTime}>
+                <Clock20Regular />
+                <Text size={200}>
+                    {formatDate(currentTime)} {formatTime(currentTime)} {timezoneAbbr && `(${timezoneAbbr})`}
+                </Text>
+            </div>
+
+            <div className={styles.divider} />
+
+            {/* Connection Status */}
             <div className={mergeClasses(styles.connectionStatus, styles[status])}>
                 {getStatusIcon(status)}
                 <Text>{getStatusText(status)}</Text>
             </div>
 
             {lastPing && (
-                <Text size={100}>
-                    Last update: {lastPing.toLocaleTimeString()}
-                </Text>
+                <>
+                    <div className={styles.divider} />
+                    <Text size={100}>
+                        Last update: {formatTime(lastPing)}
+                    </Text>
+                </>
             )}
         </div>
     )

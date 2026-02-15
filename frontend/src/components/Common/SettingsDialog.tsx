@@ -23,6 +23,7 @@ import {
 import { Modal } from '../Common/Modal';
 import { useAuth } from '../../contexts/AuthContext';
 import { usePreferences } from '../../contexts/PreferencesContext';
+import { LinkedAccounts } from '../Settings/LinkedAccounts';
 
 const useStyles = makeStyles({
   tabsContainer: {
@@ -265,11 +266,67 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
             onChange={(e) => savePreferences({ timezone: e.target.value })}
           >
             <option value="UTC">UTC</option>
-            <option value="America/New_York">Eastern Time (US & Canada)</option>
-            <option value="America/Los_Angeles">Pacific Time (US & Canada)</option>
-            <option value="Europe/London">London</option>
-            <option value="Europe/Paris">Central European Time</option>
-            <option value="Asia/Tokyo">Tokyo</option>
+            <optgroup label="Americas">
+              <option value="America/New_York">Eastern Time (US & Canada)</option>
+              <option value="America/Chicago">Central Time (US & Canada)</option>
+              <option value="America/Denver">Mountain Time (US & Canada)</option>
+              <option value="America/Los_Angeles">Pacific Time (US & Canada)</option>
+              <option value="America/Phoenix">Arizona</option>
+              <option value="America/Anchorage">Alaska</option>
+              <option value="Pacific/Honolulu">Hawaii</option>
+              <option value="America/Toronto">Toronto</option>
+              <option value="America/Vancouver">Vancouver</option>
+              <option value="America/Mexico_City">Mexico City</option>
+              <option value="America/Sao_Paulo">São Paulo</option>
+              <option value="America/Buenos_Aires">Buenos Aires</option>
+            </optgroup>
+            <optgroup label="Europe">
+              <option value="Europe/London">London</option>
+              <option value="Europe/Paris">Paris / Central European Time</option>
+              <option value="Europe/Berlin">Berlin</option>
+              <option value="Europe/Rome">Rome</option>
+              <option value="Europe/Madrid">Madrid</option>
+              <option value="Europe/Amsterdam">Amsterdam</option>
+              <option value="Europe/Brussels">Brussels</option>
+              <option value="Europe/Vienna">Vienna</option>
+              <option value="Europe/Stockholm">Stockholm</option>
+              <option value="Europe/Copenhagen">Copenhagen</option>
+              <option value="Europe/Athens">Athens</option>
+              <option value="Europe/Helsinki">Helsinki</option>
+              <option value="Europe/Dublin">Dublin</option>
+              <option value="Europe/Lisbon">Lisbon</option>
+              <option value="Europe/Warsaw">Warsaw</option>
+              <option value="Europe/Prague">Prague</option>
+              <option value="Europe/Budapest">Budapest</option>
+              <option value="Europe/Bucharest">Bucharest</option>
+            </optgroup>
+            <optgroup label="Asia & Middle East">
+              <option value="Asia/Dubai">Dubai</option>
+              <option value="Asia/Tokyo">Tokyo</option>
+              <option value="Asia/Shanghai">Shanghai</option>
+              <option value="Asia/Hong_Kong">Hong Kong</option>
+              <option value="Asia/Singapore">Singapore</option>
+              <option value="Asia/Seoul">Seoul</option>
+              <option value="Asia/Bangkok">Bangkok</option>
+              <option value="Asia/Mumbai">Mumbai</option>
+              <option value="Asia/Kolkata">Kolkata</option>
+              <option value="Asia/Karachi">Karachi</option>
+              <option value="Asia/Jerusalem">Jerusalem</option>
+              <option value="Asia/Manila">Manila</option>
+            </optgroup>
+            <optgroup label="Oceania">
+              <option value="Australia/Sydney">Sydney</option>
+              <option value="Australia/Melbourne">Melbourne</option>
+              <option value="Australia/Brisbane">Brisbane</option>
+              <option value="Australia/Perth">Perth</option>
+              <option value="Pacific/Auckland">Auckland</option>
+            </optgroup>
+            <optgroup label="Africa">
+              <option value="Africa/Cairo">Cairo</option>
+              <option value="Africa/Johannesburg">Johannesburg</option>
+              <option value="Africa/Lagos">Lagos</option>
+              <option value="Africa/Nairobi">Nairobi</option>
+            </optgroup>
           </Select>
         </Field>
         <Field label="Date Format">
@@ -377,6 +434,9 @@ export const SettingsDialog: React.FC<SettingsDialogProps> = ({
 
   const renderSecuritySettings = () => (
     <div className={styles.tabContent}>
+      {/* Linked Accounts */}
+      <LinkedAccounts />
+
       {/* Password */}
       <div className={styles.section}>
         <h3 className={styles.sectionTitle}>Password</h3>
