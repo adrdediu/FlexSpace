@@ -1,14 +1,16 @@
 import React, {useEffect, useRef, useState, useCallback} from 'react';
 import {BrowserRouter, Routes, Route, Navigate} from 'react-router-dom';
 import {FluentProvider, Nav, Spinner, makeStyles} from '@fluentui/react-components';
+import {GoogleOAuthProvider} from '@react-oauth/google';
 import {AuthProvider, useAuth} from './contexts/AuthContext';
 import {PreferencesProvider} from './contexts/PreferencesContext';
 import {ThemeProvider, useTheme} from './contexts/ThemeContext';
 import {ToastProvider} from './contexts/ToastContext';
-import {FloatingThemeToggle} from './components/FloatingThemeToggle';
 import Login from './components/Login';
 import Home from './components/Home';
 import GlobalLayout from './components/Layout/GlobalLayout';
+
+const GOOGLE_CLIENT_ID = import.meta.env.VITE_GOOGLE_CLIENT_ID || '';
 
 const useStyles = makeStyles({
   appContainer: {
@@ -51,7 +53,6 @@ const ThemedApp: React.FC = () => {
             <PreferencesProvider>
               <ToastProvider>
                 <AppRoutesWithAuth />
-                <FloatingThemeToggle />
               </ToastProvider>
             </PreferencesProvider>
           </AuthProvider>
@@ -222,9 +223,11 @@ const AppRoutesWithAuth: React.FC = () => {
 
 const App: React.FC = () => {
   return (
-    <ThemeProvider>
-      <ThemedApp />
-    </ThemeProvider>
+    <GoogleOAuthProvider clientId={GOOGLE_CLIENT_ID}>
+      <ThemeProvider>
+        <ThemedApp />
+      </ThemeProvider>
+    </GoogleOAuthProvider>
   );
 };
 

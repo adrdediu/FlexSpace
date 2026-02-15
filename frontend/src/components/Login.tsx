@@ -18,6 +18,7 @@ import {
 } from '@fluentui/react-icons';
 import {useAuth} from '../contexts/AuthContext';
 import {BuildingDesktopFilled} from '@fluentui/react-icons';
+import { GoogleLoginButton } from './GoogleLoginButton';
 const useStyles = makeStyles({
   container: {
     display:'flex',
@@ -305,6 +306,17 @@ const Login: React.FC<LoginProps> =({onMount}) => {
               </Text>
             )}
           </form>
+          
+          <div style={{ marginTop: '24px', textAlign: 'center' }}>
+            <Text>Or sign in with</Text>
+            <div style={{ marginTop: '12px', display: 'flex', justifyContent: 'center' }}>
+              <GoogleLoginButton 
+                onSuccess={() => console.log('Google login success')}
+                onError={() => console.log('Google login error')}
+              />
+            </div>
+          </div>
+
           
           <div className={styles.dividerContainer}>
             <Divider className={styles.divider} />

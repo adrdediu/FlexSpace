@@ -1,6 +1,6 @@
 import React from 'react';
 import { makeStyles, Button, tokens } from "@fluentui/react-components";
-import { WeatherMoon24Regular, WeatherSunny24Regular } from "@fluentui/react-icons";
+import { WeatherMoon24Regular, WeatherSunny24Regular, Settings24Regular } from "@fluentui/react-icons";
 import { useTheme } from '../contexts/ThemeContext';
 
 const useStyles = makeStyles({
@@ -36,21 +36,32 @@ const useStyles = makeStyles({
 });
 
 export const FloatingThemeToggle: React.FC = () => {
-  const { themeMode, toggleTheme} = useTheme();
+  const { themeMode, effectiveMode, toggleTheme} = useTheme();
   const styles = useStyles();
+  
+  const getIcon = () => {
+    if (themeMode === 'auto') {
+      return <Settings24Regular className={styles.icon} />;
+    }
+    return effectiveMode === 'dark' 
+      ? <WeatherSunny24Regular className={styles.icon} />
+      : <WeatherMoon24Regular className={styles.icon} />;
+  };
+
+  const getLabel = () => {
+    if (themeMode === 'light') return 'Switch to dark mode';
+    if (themeMode === 'dark') return 'Switch to auto mode';
+    return 'Switch to light mode';
+  };
   
   return (
     <Button
       className={styles.floatingToggle}
       appearance="subtle"
-      icon={
-        themeMode === 'dark'
-          ? <WeatherSunny24Regular className={styles.icon} />
-          : <WeatherMoon24Regular className={styles.icon} />
-      }
-      aria-label={`Switch to ${themeMode === 'light' ? 'dark' : 'light'} mode`}
+      icon={getIcon()}
+      aria-label={getLabel()}
       onClick={toggleTheme}
-      title={`Switch to ${themeMode === 'light' ? 'dark' : 'light'} mode`}
+      title={`${themeMode === 'auto' ? 'Auto (System)' : themeMode} theme`}
     />
   );
 };
