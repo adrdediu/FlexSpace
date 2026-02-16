@@ -13,6 +13,7 @@ import {
 } from '@fluentui/react-icons';
 import { FloatingPanelGrid, FloatingPanel } from '../Layout';
 import { LocationManagement } from './LocationManagement';
+import { RoomManagement } from './RoomManagement';
 import { UserGroupManagement } from './UserGroupManagement';
 
 const useStyles = makeStyles({
@@ -62,10 +63,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   );
 
   const renderRoomsTab = () => (
-    <div className={styles.placeholder}>
-      <Door20Regular style={{ fontSize: '48px', marginBottom: '16px' }} />
-      <div>Room Management - Coming Soon</div>
-    </div>
+    <RoomManagement />
   );
 
   const renderGroupsTab = () => (

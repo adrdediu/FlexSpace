@@ -1,8 +1,12 @@
+// Location modals (existing)
 export { AddLocationModal } from './AddLocationModal';
-export type { AddLocationModalProps } from './AddLocationModal';
-
 export { ManageLocationModal } from './ManageLocationModal';
-export type { ManageLocationModalProps } from './ManageLocationModal';
-
 export { ManageLocationManagersModal } from './ManageLocationManagersModal';
-export type { ManageLocationManagersModalProps } from './ManageLocationManagersModal';
+
+// Room modals (new)
+export { AddRoomModal } from './AddRoomModal';
+export { ManageRoomModal } from './ManageRoomModal';
+export { ManageRoomManagersModal } from './ManageRoomManagersModal';
+export { ManageAllowedGroupsModal } from './ManageAllowedGroupsModal';
+export { UploadRoomMapModal } from './UploadRoomMapModal';
+export { ManageDesksModal } from './ManageDesksModal';

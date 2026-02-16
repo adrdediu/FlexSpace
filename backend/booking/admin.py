@@ -7,6 +7,7 @@ from .models import UserPreferences
 from .models_preferences import UserPreferences
 from .models import Country, Location, Floor, Room, Desk, Booking
 from django.utils.html import format_html
+from django.utils.safestring import mark_safe
 from django.core.exceptions import ValidationError
 
 
@@ -87,11 +88,15 @@ class DeskAdmin(admin.ModelAdmin):
     def permanent_status(self, obj):
         """ Display permanent status with color"""
         if obj.is_permanent:
+            if obj.permanent_assignee:
+                username = obj.permanent_assignee.username
+            else:
+                username = 'No Assignee'
             return format_html(
-                '<span style="color:#8b5cf6; font-weight: bold;">Ok {}</span>',
-                obj.permanent_assignee.username if obj.permanent_assignee else 'No Assignee'
+                '<span style="color:#8b5cf6; font-weight: bold;">✓ {}</span>',
+                username
             )
-        return format_html('<span style="color:#6b7280;">-</span')
+        return mark_safe('<span style="color:#6b7280;">-</span>')
     permanent_status.short_description = 'Permanent Assignment' # type: ignore
 
     def get_readonly_fields(self, request, obj=None):
@@ -120,7 +125,7 @@ class BookingAdmin(admin.ModelAdmin):
     def is_permanent_desk(self,obj):
         """ Show if booking is for permanent desk"""
         if obj.desk.is_permanent:
-            return format_html('<span style="color: #8B5CF6;">OK Permanent</span>')
+            return format_html('<span style="color: #8B5CF6;">✓ Permanent</span>')
         return '-'
     is_permanent_desk.short_description = 'Desk Type' # type: ignore
 
