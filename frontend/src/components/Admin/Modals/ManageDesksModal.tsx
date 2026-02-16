@@ -15,12 +15,22 @@ import {
   Spinner,
   Badge,
   Tooltip,
+  MenuPopover,
+  Menu,
+  MenuList,
+  MenuItem,
+  MenuTrigger,
 } from '@fluentui/react-components';
 import {
   Add20Regular,
   Delete20Regular,
   Checkmark20Regular,
   Person24Filled,
+  LocationRegular,
+  EditRegular,
+  ArrowReset20Regular,
+  ZoomIn20Regular,
+  ZoomOut20Regular,
 } from '@fluentui/react-icons';
 import { type RoomWithDesks, type Desk } from '../../../services/roomApi';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -43,6 +53,12 @@ const useStyles = makeStyles({
     flex: 1,
     display: 'flex',
     flexDirection: 'column',
+    gap: tokens.spacingVerticalM,
+  },
+  mapControls: {
+    display: 'flex',
+    gap: tokens.spacingHorizontalS,
+    justifyContent: 'flex-end',
   },
   mapContainer: {
     position: 'relative',
@@ -51,12 +67,25 @@ const useStyles = makeStyles({
     borderRadius: tokens.borderRadiusMedium,
     overflow: 'hidden',
     backgroundColor: tokens.colorNeutralBackground2,
+    cursor: 'grab',
+  },
+  mapContainerPanning: {
+    cursor: 'grabbing',
+  },
+  mapWrapper: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: '100%',
+    height: '100%',
+    transformOrigin: '0 0',
   },
   mapImage: {
     width: '100%',
     height: '100%',
     objectFit: 'contain',
     userSelect: 'none',
+    pointerEvents: 'none',
   },
   deskMarker: {
     position: 'absolute',
@@ -166,6 +195,7 @@ const useStyles = makeStyles({
   },
   emptyMap: {
     display: 'flex',
+    flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
     height: '100%',
@@ -203,10 +233,16 @@ export const ManageDesksModal: React.FC<ManageDesksModalProps> = ({
   const [addingDesk, setAddingDesk] = useState(false);
   const [newDeskName, setNewDeskName] = useState('');
   const [draggingDeskId, setDraggingDeskId] = useState<number | null>(null);
-  const [hoveredDeskId, setHoveredDeskId] = useState<number | null>(null);
+  const [editingPositionDeskId, setEditingPositionDeskId] = useState<number | null>(null);
+  
+  // Zoom and pan state
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const [isPanning, setIsPanning] = useState(false);
+  const [panStart, setPanStart] = useState({ x: 0, y: 0 });
   
   const mapContainerRef = useRef<HTMLDivElement>(null);
-  const mapImageRef = useRef<HTMLImageElement>(null);
+  const mapWrapperRef = useRef<HTMLDivElement>(null);
   const dragOffsetRef = useRef({ x: 0, y: 0 });
   const initialLoadRef = useRef(true);
 
@@ -216,7 +252,7 @@ export const ManageDesksModal: React.FC<ManageDesksModalProps> = ({
   useEffect(() => {
     if (open && room && initialLoadRef.current) {
       setDesks(room.desks || []);
-      const positions = new Map<number, DeskPosition>();
+      const positions = new Map<DeskPosition>();
       room.desks?.forEach(desk => {
         positions.set(desk.id, {
           id: desk.id,
@@ -232,8 +268,105 @@ export const ManageDesksModal: React.FC<ManageDesksModalProps> = ({
     // Reset on close
     if (!open) {
       initialLoadRef.current = true;
+      setZoom(1);
+      setPan({ x: 0, y: 0 });
     }
-  }, [open, room?.id]); // Only depend on open and room.id, not the full room object
+  }, [open, room?.id]);
+
+  const handleZoomIn = () => {
+    setZoom(prev => Math.min(prev + 0.25, 3));
+  };
+
+  const handleZoomOut = () => {
+    setZoom(prev => Math.max(prev - 0.25, 0.5));
+  };
+
+  const handleResetView = () => {
+    setZoom(1);
+    setPan({ x: 0, y: 0 });
+  };
+
+  const handleWheel = (e: React.WheelEvent) => {
+    e.preventDefault();
+    const delta = e.deltaY > 0 ? -0.1 : 0.1;
+    setZoom(prev => Math.max(0.5, Math.min(3, prev + delta)));
+  };
+
+  const handleMapMouseDown = (e: React.MouseEvent) => {
+    if (draggingDeskId !== null) return; // Don't pan while dragging desk
+    
+    setIsPanning(true);
+    setPanStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
+  };
+
+  const handleMapMouseMove = (e: React.MouseEvent) => {
+    if (isPanning && draggingDeskId === null) {
+      setPan({
+        x: e.clientX - panStart.x,
+        y: e.clientY - panStart.y,
+      });
+      return;
+    }
+
+    if (draggingDeskId !== null) {
+      handleDeskDrag(e);
+    }
+  };
+
+  const handleMapMouseUp = () => {
+    setIsPanning(false);
+    setDraggingDeskId(null);
+  };
+
+  const handleDeskMouseDown = (e: React.MouseEvent, deskId: number) => {
+    e.stopPropagation();
+    e.preventDefault();
+    
+    const wrapper = mapWrapperRef.current;
+    if (!wrapper) return;
+
+    const position = deskPositions.get(deskId);
+    if (!position) return;
+
+    const wrapperRect = wrapper.getBoundingClientRect();
+    
+    // Calculate desk position in transformed space
+    const deskX = position.x * wrapperRect.width;
+    const deskY = position.y * wrapperRect.height;
+    
+    dragOffsetRef.current = {
+      x: (e.clientX - wrapperRect.left) - deskX,
+      y: (e.clientY - wrapperRect.top) - deskY,
+    };
+
+    setDraggingDeskId(deskId);
+  };
+
+  const handleDeskDrag = (e: React.MouseEvent) => {
+    if (draggingDeskId === null) return;
+
+    const wrapper = mapWrapperRef.current;
+    if (!wrapper) return;
+
+    const wrapperRect = wrapper.getBoundingClientRect();
+    
+    // Calculate new position as percentage
+    let x = ((e.clientX - wrapperRect.left) - dragOffsetRef.current.x) / wrapperRect.width;
+    let y = ((e.clientY - wrapperRect.top) - dragOffsetRef.current.y) / wrapperRect.height;
+
+    // Clamp to 0-1 range
+    x = Math.max(0, Math.min(1, x));
+    y = Math.max(0, Math.min(1, y));
+
+    const newPositions = new Map(deskPositions);
+    newPositions.set(draggingDeskId, {
+      id: draggingDeskId,
+      x,
+      y,
+      saved: false,
+    });
+    setDeskPositions(newPositions);
+  };
 
   const handleAddDesk = async () => {
     if (!room || !newDeskName.trim()) return;
@@ -262,7 +395,7 @@ export const ManageDesksModal: React.FC<ManageDesksModalProps> = ({
         id: newDesk.id,
         x: 0.5,
         y: 0.5,
-        saved: false, // New desk needs positioning
+        saved: false,
       }));
       setNewDeskName('');
     } catch (err: any) {
@@ -320,12 +453,10 @@ export const ManageDesksModal: React.FC<ManageDesksModalProps> = ({
         throw new Error('Failed to save desk position');
       }
 
-      // Mark as saved
       const newPositions = new Map(deskPositions);
       newPositions.set(deskId, { ...position, saved: true });
       setDeskPositions(newPositions);
       
-      // Update the desk in the list with new position
       const updatedDesk = await response.json();
       setDesks(desks.map(d => d.id === deskId ? updatedDesk : d));
     } catch (err: any) {
@@ -336,61 +467,6 @@ export const ManageDesksModal: React.FC<ManageDesksModalProps> = ({
     }
   };
 
-  const handleMouseDown = (e: React.MouseEvent, deskId: number) => {
-    e.preventDefault();
-    const container = mapContainerRef.current;
-    const image = mapImageRef.current;
-    if (!container || !image) return;
-
-    const imageRect = image.getBoundingClientRect();
-    const position = deskPositions.get(deskId);
-    if (!position) return;
-
-    const deskCenterX = position.x * imageRect.width;
-    const deskCenterY = position.y * imageRect.height;
-    dragOffsetRef.current = {
-      x: e.clientX - imageRect.left - deskCenterX,
-      y: e.clientY - imageRect.top - deskCenterY,
-    };
-
-    setDraggingDeskId(deskId);
-  };
-
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (draggingDeskId === null) return;
-
-    const container = mapContainerRef.current;
-    const image = mapImageRef.current;
-    if (!container || !image) return;
-
-    const imageRect = image.getBoundingClientRect();
-    
-    // Calculate position as percentage (0-1) relative to the actual image
-    let x = (e.clientX - imageRect.left - dragOffsetRef.current.x) / imageRect.width;
-    let y = (e.clientY - imageRect.top - dragOffsetRef.current.y) / imageRect.height;
-
-    // Clamp to valid range with margin (0.05 = 5% from edge for 40px desk marker)
-    const margin = 0.05;
-    x = Math.max(margin, Math.min(1 - margin, x));
-    y = Math.max(margin, Math.min(1 - margin, y));
-
-    const currentPosition = deskPositions.get(draggingDeskId);
-    if (!currentPosition) return;
-
-    const newPositions = new Map(deskPositions);
-    newPositions.set(draggingDeskId, {
-      id: draggingDeskId,
-      x,
-      y,
-      saved: false, // Mark as unsaved when moved
-    });
-    setDeskPositions(newPositions);
-  };
-
-  const handleMouseUp = () => {
-    setDraggingDeskId(null);
-  };
-
   const totalDesks = desks.length;
   const bookedDesks = desks.filter(d => d.is_booked).length;
   const permanentDesks = desks.filter(d => d.is_permanent).length;
@@ -398,34 +474,22 @@ export const ManageDesksModal: React.FC<ManageDesksModalProps> = ({
 
   const getDeskMarkerStyle = (desk: Desk): React.CSSProperties => {
     const position = deskPositions.get(desk.id);
-    const image = mapImageRef.current;
-    const container = mapContainerRef.current;
-    if (!position || !image || !container) return {};
-
-    const imageRect = image.getBoundingClientRect();
-    const containerRect = container.getBoundingClientRect();
-    
-    // Calculate position relative to the container, but based on image dimensions
-    const left = imageRect.left - containerRect.left + (position.x * imageRect.width);
-    const top = imageRect.top - containerRect.top + (position.y * imageRect.height);
+    if (!position) return {};
     
     return {
-      left: `${left}px`,
-      top: `${top}px`,
+      left: `${position.x * 100}%`,
+      top: `${position.y * 100}%`,
       transform: 'translate(-50%, -50%)',
     };
-  };
-
-  const getDeskNumber = (desk: Desk): string => {
-    const match = desk.name.match(/\d+/);
-    return match ? match[0] : desk.name.substring(0, 2);
   };
 
   return (
     <Dialog open={open} onOpenChange={(_, data) => !data.open && onClose()}>
       <DialogSurface style={{ maxWidth: '1200px', maxHeight: '90vh' }}>
         <DialogBody>
-          <DialogTitle>Manage Desks - {room?.name}</DialogTitle>
+          <DialogTitle>
+            Manage Desks - {room?.name}
+          </DialogTitle>
           <DialogContent>
             {/* Stats Row */}
             <div className={styles.statsRow}>
@@ -447,9 +511,9 @@ export const ManageDesksModal: React.FC<ManageDesksModalProps> = ({
               </div>
             </div>
 
-            {/* Main Content - Left: Desks List, Right: Map */}
+            {/* Main Content */}
             <div className={styles.modalContent}>
-              {/* Left Panel - Desks List */}
+              {/* Left Panel */}
               <div className={styles.leftPanel}>
                 <div className={styles.desksHeader}>
                   <Text size={400} weight="semibold">Desks ({desks.length})</Text>
@@ -492,7 +556,6 @@ export const ManageDesksModal: React.FC<ManageDesksModalProps> = ({
                   )}
                 </div>
 
-                {/* Add Desk Section */}
                 <div className={styles.addDeskSection}>
                   <Field>
                     <Input
@@ -518,85 +581,139 @@ export const ManageDesksModal: React.FC<ManageDesksModalProps> = ({
                 </div>
               </div>
 
-              {/* Right Panel - Map */}
+              {/* Right Panel */}
               <div className={styles.rightPanel}>
+                <div className={styles.mapControls}>
+                  <Button
+                    appearance="subtle"
+                    icon={<ZoomOut20Regular />}
+                    size="small"
+                    onClick={handleZoomOut}
+                    disabled={zoom <= 0.5}
+                  />
+                  <Text size={200}>{Math.round(zoom * 100)}%</Text>
+                  <Button
+                    appearance="subtle"
+                    icon={<ZoomIn20Regular />}
+                    size="small"
+                    onClick={handleZoomIn}
+                    disabled={zoom >= 3}
+                  />
+                  <Button
+                    appearance="subtle"
+                    icon={<ArrowReset20Regular />}
+                    size="small"
+                    onClick={handleResetView}
+                  />
+                </div>
+
                 {room?.map_image ? (
                   <div
                     ref={mapContainerRef}
-                    className={styles.mapContainer}
-                    onMouseMove={handleMouseMove}
-                    onMouseUp={handleMouseUp}
-                    onMouseLeave={handleMouseUp}
+                    className={`${styles.mapContainer} ${isPanning ? styles.mapContainerPanning : ''}`}
+                    onMouseDown={handleMapMouseDown}
+                    onMouseMove={handleMapMouseMove}
+                    onMouseUp={handleMapMouseUp}
+                    onMouseLeave={handleMapMouseUp}
+                    onWheel={handleWheel}
                   >
-                    <img
-                      ref={mapImageRef}
-                      src={room.map_image}
-                      alt="Room map"
-                      className={styles.mapImage}
-                      draggable={false}
-                    />
-                    
-                    {/* Desk Markers */}
-                    {desks.map((desk) => {
-                      const position = deskPositions.get(desk.id);
-                      const isDragging = draggingDeskId === desk.id;
-                      const isHovered = hoveredDeskId === desk.id && !isDragging;
-                      const isUnsaved = position && !position.saved;
+                    <div
+                      ref={mapWrapperRef}
+                      className={styles.mapWrapper}
+                      style={{
+                        transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+                      }}
+                    >
+                      <img
+                        src={room.map_image}
+                        alt="Room map"
+                        className={styles.mapImage}
+                        draggable={false}
+                      />
                       
-                      // Determine background color based on status
-                      let bgColor = '#0078d4'; // Default blue
-                      let iconColor = '#ffffff'; // White icon
-                      
-                      if (isUnsaved) {
-                        bgColor = '#f59e0b'; // Yellow/amber for unsaved
-                      } else if (desk.is_booked) {
-                        bgColor = '#ef4444'; // Red for booked
-                      } else if (desk.is_permanent) {
-                        bgColor = '#a855f7'; // Purple for permanent
-                      }
-                      
-                      const markerClass = `
-                        ${styles.deskMarker} 
-                        ${isDragging ? styles.deskMarkerDragging : ''} 
-                      `;
-                      
-                      return (
-                        <div
-                          key={desk.id}
-                          style={{ position: 'absolute', ...getDeskMarkerStyle(desk) }}
-                          onMouseEnter={() => setHoveredDeskId(desk.id)}
-                          onMouseLeave={() => setHoveredDeskId(null)}
-                        >
-                          {/* Save Button - shown on hover for unsaved positions */}
-                          {isHovered && isUnsaved && (
-                            <Tooltip content="Save position" relationship="label">
-                              <Button
-                                appearance="primary"
-                                size="small"
-                                icon={<Checkmark20Regular />}
-                                onClick={() => handleSaveDeskPosition(desk.id)}
-                                disabled={savingDeskId === desk.id}
-                                className={styles.saveButton}
-                              >
-                                {savingDeskId === desk.id ? 'Saving...' : 'Save'}
-                              </Button>
-                            </Tooltip>
-                          )}
-                          
+                      {/* Desk Markers */}
+                      {desks.map((desk) => {
+                        const position = deskPositions.get(desk.id);
+                        const isDragging = draggingDeskId === desk.id;
+                        const isUnsaved = position && !position.saved;
+                        
+                        let bgColor = '#0078d4';
+                        let iconColor = '#ffffff';
+                        
+                        if (isUnsaved) {
+                          bgColor = '#f59e0b';
+                        } else if (desk.is_booked) {
+                          bgColor = '#ef4444';
+                        } else if (desk.is_permanent) {
+                          bgColor = '#a855f7';
+                        }
+                        
+                        const markerClass = `
+                          ${styles.deskMarker} 
+                          ${isDragging ? styles.deskMarkerDragging : ''} 
+                        `;
+                        
+                        return (
                           <div
-                            className={markerClass}
-                            onMouseDown={(e) => handleMouseDown(e, desk.id)}
-                            title={desk.name}
-                            style={{ 
-                              backgroundColor: bgColor,
-                              color: iconColor,
-                            }}
+                            key={desk.id}
+                            style={{ position: 'absolute', ...getDeskMarkerStyle(desk) }}
                           >
-                            <Person24Filled />
+                            <Menu>
+                              <MenuTrigger disableButtonEnhancement>
+                                <div
+                                  className={markerClass}
+                                  onMouseDown={(e) => {
+                                    // Only allow dragging if in edit mode for this desk
+                                    if (editingPositionDeskId === desk.id) {
+                                      handleDeskMouseDown(e, desk.id);
+                                    }
+                                  }}
+                                  title={desk.name}
+                                  style={{ 
+                                    backgroundColor: editingPositionDeskId === desk.id ? '#f59e0b' : bgColor,
+                                    color: iconColor,
+                                    cursor: editingPositionDeskId === desk.id ? 'move' : 'pointer',
+                                  }}
+                                >
+                                  <Person24Filled />
+                                </div>
+                              </MenuTrigger>
+                              <MenuPopover>
+                                <MenuList>
+                                  {isUnsaved || editingPositionDeskId === desk.id ? (
+                                    <MenuItem
+                                      icon={<Checkmark20Regular />}
+                                      onClick={() => {
+                                        handleSaveDeskPosition(desk.id);
+                                        setEditingPositionDeskId(null);
+                                      }}
+                                      disabled={savingDeskId === desk.id}
+                                    >
+                                      {savingDeskId === desk.id ? 'Saving...' : 'Save Position'}
+                                    </MenuItem>
+                                  ) : (
+                                    <MenuItem
+                                      icon={<LocationRegular />}
+                                      onClick={() => {
+                                        setEditingPositionDeskId(desk.id);
+                                      }}
+                                    >
+                                      Change Position
+                                    </MenuItem>
+                                  )}
+                                  <MenuItem
+                                    icon={<Delete20Regular />}
+                                    onClick={() => handleDeleteDesk(desk.id)}
+                                  >
+                                    Delete Desk
+                                  </MenuItem>
+                                </MenuList>
+                              </MenuPopover>
+                            </Menu>
                           </div>
-                        </div>
-                      );
-                    })}
+                        );
+                      })}
+                    </div>
                   </div>
                 ) : (
                   <div className={styles.mapContainer}>
