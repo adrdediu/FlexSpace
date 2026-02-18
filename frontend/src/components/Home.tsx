@@ -254,7 +254,7 @@ const Home: React.FC<HomeProps> = ({ onMount }) => {
         position="center-left"
         size="small"
         opacity="glass"
-        style={{ top: '16px', bottom: '16px', height: 'calc(100% - 32px)' }}
+        style={{ top: '16px', bottom: '16px', height: 'calc(100% - 32px)', transform: 'none' }}
       >
         <TodayPanel
           refreshToken={bookingRefreshToken}
@@ -269,8 +269,8 @@ const Home: React.FC<HomeProps> = ({ onMount }) => {
         opacity="glass"
         noPadding={false}
         style={{
-          left: '340px',
-          right: '340px',
+          left: '360px',
+          right: '360px',
           top: '16px',
           bottom: '16px',
           width: 'auto',
@@ -307,7 +307,7 @@ const Home: React.FC<HomeProps> = ({ onMount }) => {
         position="center-right"
         size="small"
         opacity="glass"
-        style={{ top: '16px', bottom: '16px', height: 'calc(100% - 32px)' }}
+        style={{ top: '16px', bottom: '16px', height: 'calc(100% - 32px)', transform: 'none' }}
       >
         <LocationBrowser
           selectedRoomId={selectedRoomData?.id}

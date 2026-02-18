@@ -69,7 +69,8 @@ class RoomSerializer(serializers.ModelSerializer):
             'id', 'name', 'description', 'floor', 'floor_id', 'map_image',
             'room_managers', 'room_manager_ids',
             'allowed_groups', 'allowed_group_ids',
-            'is_manager', 'can_book', 'desk_count', 'is_under_maintenance'
+            'is_manager', 'can_book', 'desk_count',
+            'is_under_maintenance', 'maintenance_by_name'
         ]
         read_only_fields = ['id']
     
@@ -105,7 +106,8 @@ class RoomListSerializer(serializers.ModelSerializer):
         fields = [
             'id', 'name', 'description', 'floor', 'floor_name',
             'location_name', 'map_image', 'desk_count',
-            'available_desk_count', 'is_manager', 'can_book', 'is_under_maintenance'
+            'available_desk_count', 'is_manager', 'can_book',
+            'is_under_maintenance', 'maintenance_by_name'
         ]
         read_only_fields = ['id']
     

@@ -30,6 +30,7 @@ import {
   AddSquare20Regular,
   SubtractSquare20Regular,
   ArrowCounterclockwise20Regular,
+  Wrench20Regular,
 } from '@fluentui/react-icons';
 import { type RoomWithDesks, type Desk } from '../../../services/roomApi';
 import { useAuth } from '../../../contexts/AuthContext';
@@ -264,7 +265,8 @@ export const ManageDesksModal: React.FC<ManageDesksModalProps> = ({
   onRefresh,
 }) => {
   const styles = useStyles();
-  const { authenticatedFetch } = useAuth();
+  const { authenticatedFetch, user } = useAuth();
+  const roomIdRef = useRef<number | null>(null); // stable ref so close-cleanup can always read it
   const [desks, setDesks] = useState<Desk[]>([]);
   const [deskPositions, setDeskPositions] = useState<Map<number, DeskPosition>>(new Map());
   const [loading, setLoading] = useState(false);
@@ -275,6 +277,7 @@ export const ManageDesksModal: React.FC<ManageDesksModalProps> = ({
   const [editingPositionDeskId, setEditingPositionDeskId] = useState<number | null>(null);
   const [assignPermanentDesk, setAssignPermanentDesk] = useState<Desk | null>(null);
   const [selectedDeskId, setSelectedDeskId] = useState<number | null>(null);
+  const [isMaintenance, setIsMaintenance] = useState(false);
   // Ref map so we can imperatively open a specific marker's Menu
   const markerRefs = useRef<Map<number, HTMLDivElement>>(new Map());
 
@@ -294,6 +297,10 @@ export const ManageDesksModal: React.FC<ManageDesksModalProps> = ({
   const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
   useEffect(() => {
+    if (room?.id) roomIdRef.current = room.id; // always keep ref fresh
+  }, [room?.id]);
+
+  useEffect(() => {
     if (open && room && initialLoadRef.current) {
       setDesks(room.desks || []);
       const positions = new Map<number, DeskPosition>();
@@ -307,10 +314,6 @@ export const ManageDesksModal: React.FC<ManageDesksModalProps> = ({
       });
       setDeskPositions(positions);
       initialLoadRef.current = false;
-
-      // Lock room for bookings while admin is editing
-      authenticatedFetch(`${API_BASE_URL}/admin/rooms/${room.id}/set-maintenance/`, { method: 'POST' })
-        .catch(err => console.error('Failed to set maintenance mode:', err));
     }
     if (!open) {
       initialLoadRef.current = true;
@@ -318,10 +321,12 @@ export const ManageDesksModal: React.FC<ManageDesksModalProps> = ({
       setPan({ x: 0, y: 0 });
       setEditingPositionDeskId(null);
       setSelectedDeskId(null);
+      setIsMaintenance(false);
 
-      // Release maintenance lock when admin closes the modal
-      if (room?.id) {
-        authenticatedFetch(`${API_BASE_URL}/admin/rooms/${room.id}/clear-maintenance/`, { method: 'POST' })
+      // Use ref so this fires even if room prop has already been set to null by parent
+      const id = roomIdRef.current;
+      if (id) {
+        authenticatedFetch(`${API_BASE_URL}/admin/rooms/${id}/clear-maintenance/`, { method: 'POST' })
           .catch(err => console.error('Failed to clear maintenance mode:', err));
       }
     }
@@ -611,6 +616,18 @@ const handleWheel = (e: React.WheelEvent) => {
     setDesks(prev => prev.map(d => d.id === deskId ? updated : d));
   };
 
+  // ── Maintenance toggle ──────────────────────────────────────────
+  const handleToggleMaintenance = async () => {
+    if (!room) return;
+    const endpoint = isMaintenance ? 'clear-maintenance' : 'set-maintenance';
+    try {
+      await authenticatedFetch(`${API_BASE_URL}/admin/rooms/${room.id}/${endpoint}/`, { method: 'POST' });
+      setIsMaintenance(prev => !prev);
+    } catch (err) {
+      console.error('Failed to toggle maintenance mode:', err);
+    }
+  };
+
   // ── Derived stats ───────────────────────────────────────────────
   const totalDesks     = desks.length;
   const bookedDesks    = desks.filter(d => d.is_booked).length;
@@ -748,6 +765,17 @@ const handleListDeskClick = (desk: Desk) => {
                 {/* ── Right: map ── */}
                 <div className={styles.rightPanel}>
                   <div className={styles.mapControls}>
+                    <Button
+                      appearance={isMaintenance ? 'primary' : 'subtle'}
+                      icon={<Wrench20Regular />}
+                      size="small"
+                      onClick={handleToggleMaintenance}
+                      title={isMaintenance ? 'Disable maintenance mode (allow bookings)' : 'Enable maintenance mode (block bookings)'}
+                    >
+                      {isMaintenance
+                        ? `Maintenance — ${user?.first_name || user?.username || 'you'}`
+                        : 'Maintenance'}
+                    </Button>
                     <Button appearance="subtle" icon={<SubtractSquare20Regular />} size="small" onClick={handleZoomOut} disabled={zoom <= 0.25} title="Zoom out" />
                     <Text size={200}>{Math.round(zoom * 100)}%</Text>
                     <Button appearance="subtle" icon={<AddSquare20Regular />} size="small" onClick={handleZoomIn} disabled={zoom >= 4} title="Zoom in" />

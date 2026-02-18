@@ -1,4 +1,3 @@
-
 interface WebSocketCallbacks {
     onOpen?: () => void;
     onMessage?: (data:any) => void;
@@ -114,6 +113,9 @@ class WebSocketService {
         } else if (connectionId.startsWith('room_')) {
             const roomId = connectionId.replace('room_', '');
             this.connectToRoom(roomId, callbacks);
+        } else if (connectionId.startsWith('location_')) {
+            const locationId = connectionId.replace('location_', '');
+            this.connectToLocation(locationId, callbacks);
         }
     }
     
@@ -184,6 +186,17 @@ class WebSocketService {
     ): boolean {
         const connectionId = `room_${roomId}`;
         const url = `${this.getWebSocketBaseUrl()}/ws/rooms/${roomId}/`;
+
+        this.createConnection(connectionId, url, callbacks);
+        return true;
+    }
+
+    connectToLocation(
+        locationId: number | string,
+        callbacks: WebSocketCallbacks = {}
+    ): boolean {
+        const connectionId = `location_${locationId}`;
+        const url = `${this.getWebSocketBaseUrl()}/ws/locations/${locationId}/`;
 
         this.createConnection(connectionId, url, callbacks);
         return true;

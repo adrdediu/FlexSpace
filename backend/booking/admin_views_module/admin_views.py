@@ -6,6 +6,8 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated
 from django.contrib.auth.models import User
+from asgiref.sync import async_to_sync
+from channels.layers import get_channel_layer
 
 from ..models import Location, Room, Floor, UserGroup
 from ..serializers.location import LocationSerializer, LocationListSerializer
@@ -405,34 +407,34 @@ class RoomManagementViewSet(viewsets.ModelViewSet):
 
     @action(detail=True, methods=['post'], url_path='set-maintenance')
     def set_maintenance(self, request, pk=None):
-        """
-        Mark room as under maintenance (unavailable for booking).
-        Called automatically when a manager opens the desk editor.
-        Endpoint: POST /api/admin/rooms/{id}/set-maintenance/
-        """
         room = self.get_object()
         if not room.is_room_manager(request.user) and not request.user.is_superuser:
-            return Response(
-                {'error': 'Only room managers can set maintenance mode'},
-                status=status.HTTP_403_FORBIDDEN
-            )
+            return Response({'error': 'Only room managers can set maintenance mode'}, status=status.HTTP_403_FORBIDDEN)
+
+        by = request.user.get_full_name() or request.user.username
         room.is_under_maintenance = True
-        room.save(update_fields=['is_under_maintenance'])
-        return Response({'is_under_maintenance': True})
+        room.maintenance_by_name = by
+        room.save(update_fields=['is_under_maintenance', 'maintenance_by_name'])
+
+        event = {'type': 'room_maintenance', 'room_id': room.id, 'enabled': True, 'by': by}
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(f'room_{room.id}', event)
+        async_to_sync(channel_layer.group_send)(f'location_{room.floor.location_id}', event)
+        return Response({'is_under_maintenance': True, 'maintenance_by_name': by})
 
     @action(detail=True, methods=['post'], url_path='clear-maintenance')
     def clear_maintenance(self, request, pk=None):
-        """
-        Mark room as available again.
-        Called automatically when a manager closes the desk editor.
-        Endpoint: POST /api/admin/rooms/{id}/clear-maintenance/
-        """
         room = self.get_object()
         if not room.is_room_manager(request.user) and not request.user.is_superuser:
-            return Response(
-                {'error': 'Only room managers can clear maintenance mode'},
-                status=status.HTTP_403_FORBIDDEN
-            )
+            return Response({'error': 'Only room managers can clear maintenance mode'}, status=status.HTTP_403_FORBIDDEN)
+
+        by = request.user.get_full_name() or request.user.username
         room.is_under_maintenance = False
-        room.save(update_fields=['is_under_maintenance'])
-        return Response({'is_under_maintenance': False})
+        room.maintenance_by_name = ''
+        room.save(update_fields=['is_under_maintenance', 'maintenance_by_name'])
+
+        event = {'type': 'room_maintenance', 'room_id': room.id, 'enabled': False, 'by': by}
+        channel_layer = get_channel_layer()
+        async_to_sync(channel_layer.group_send)(f'room_{room.id}', event)
+        async_to_sync(channel_layer.group_send)(f'location_{room.floor.location_id}', event)
+        return Response({'is_under_maintenance': False, 'maintenance_by_name': ''})

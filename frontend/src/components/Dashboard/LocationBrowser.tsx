@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   makeStyles,
   tokens,
@@ -22,6 +22,7 @@ import { createCountriesApi } from '../../services/countriesApi';
 import { createFloorApi, type Floor } from '../../services/floorApi';
 import { useAuth } from '../../contexts/AuthContext';
 import { type RoomWithDesks } from '../../services/roomApi';
+import websocketService from '../../services/webSocketService';
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
@@ -199,6 +200,7 @@ interface PublicRoom {
   available_desk_count: number;
   can_book: boolean;
   is_under_maintenance: boolean;
+  maintenance_by_name: string;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -232,6 +234,32 @@ export const LocationBrowser: React.FC<LocationBrowserProps> = ({
   const [loading, setLoading] = useState(false);
 
   const floorApi = createFloorApi(authenticatedFetch);
+
+  // ── Location WS — connect when a location is selected ──
+  useEffect(() => {
+    if (!selectedLocation) return;
+    const locId = selectedLocation.id;
+
+    websocketService.connectToLocation(locId, {
+      onMessage: (data: any) => {
+        if (data.type === 'room_maintenance') {
+          setRooms(prev => prev.map(r =>
+            r.id === data.room_id
+              ? { ...r, is_under_maintenance: data.enabled, maintenance_by_name: data.enabled ? (data.by ?? '') : '' }
+              : r
+          ));
+        } else if (data.type === 'room_availability') {
+          setRooms(prev => prev.map(r =>
+            r.id === data.room_id
+              ? { ...r, available_desk_count: data.available_desk_count }
+              : r
+          ));
+        }
+      },
+    });
+
+    return () => websocketService.closeConnection(`location_${locId}`);
+  }, [selectedLocation?.id]);
 
   // ── Load locations ──
   const loadLocations = useCallback(async () => {
@@ -429,7 +457,11 @@ export const LocationBrowser: React.FC<LocationBrowserProps> = ({
                     <div className={styles.cardTitle}>{room.name}</div>
                     <div className={styles.cardMeta}>
                       {room.is_under_maintenance
-                        ? 'Under maintenance'
+                        ? <>
+                            <span style={{ fontWeight: 600, color: tokens.colorPaletteMarigoldForeground1 }}>Under Maintenance</span>
+                            {room.maintenance_by_name && ` · issued by ${room.maintenance_by_name}`}
+                            {'. Please contact them.'}
+                          </>
                         : `${room.available_desk_count} of ${room.desk_count} available`
                       }
                     </div>

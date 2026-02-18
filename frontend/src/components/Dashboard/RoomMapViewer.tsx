@@ -5,7 +5,6 @@ import {
   Text,
   Button,
   Spinner,
-  Badge,
   Tooltip,
   Dialog,
   DialogSurface,
@@ -16,6 +15,11 @@ import {
   Field,
   Input,
   Select,
+  Menu,
+  MenuPopover,
+  MenuList,
+  MenuItem,
+  MenuTrigger,
 } from '@fluentui/react-components';
 import {
   AddSquare20Regular,
@@ -29,15 +33,19 @@ import {
   CalendarLtr20Regular,
   Clock20Regular,
   Warning20Regular,
+  CalendarAdd20Regular,
+  CalendarCancel20Regular,
 } from '@fluentui/react-icons';
-import { type RoomWithDesks, type Desk } from '../../services/roomApi';
+import { type RoomWithDesks } from '../../services/roomApi';
 import { createBookingApi, type Booking } from '../../services/bookingApi';
 import { useAuth } from '../../contexts/AuthContext';
 import websocketService from '../../services/webSocketService';
 
-// ─── Styles ──────────────────────────────────────────────────────────────────
+// ─── Styles ───────────────────────────────────────────────────────────────────
+// Map-related styles copied verbatim from ManageDesksModal to guarantee identical rendering.
 
 const useStyles = makeStyles({
+  // ── Root layout ──
   root: {
     display: 'flex',
     flexDirection: 'column',
@@ -45,7 +53,7 @@ const useStyles = makeStyles({
     gap: tokens.spacingVerticalS,
   },
 
-  // Top bar
+  // ── Top bar ──
   topBar: {
     display: 'flex',
     alignItems: 'center',
@@ -66,10 +74,10 @@ const useStyles = makeStyles({
   mapControls: {
     display: 'flex',
     alignItems: 'center',
-    gap: tokens.spacingHorizontalXS,
+    gap: tokens.spacingHorizontalS,
   },
 
-  // Legend
+  // ── Legend ──
   legend: {
     display: 'flex',
     alignItems: 'center',
@@ -91,17 +99,30 @@ const useStyles = makeStyles({
     flexShrink: 0,
   },
 
-  // Map
+  // ── Maintenance banner ──
+  maintenanceBanner: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalS,
+    padding: `${tokens.spacingVerticalS} ${tokens.spacingHorizontalM}`,
+    backgroundColor: tokens.colorPaletteMarigoldBackground1,
+    border: `1px solid ${tokens.colorPaletteMarigoldBorder1}`,
+    borderRadius: tokens.borderRadiusMedium,
+    color: tokens.colorPaletteMarigoldForeground1,
+    fontSize: tokens.fontSizeBase200,
+    fontWeight: tokens.fontWeightSemibold,
+    flexShrink: 0,
+  },
+
+  // ── Map — copied verbatim from ManageDesksModal ──
   mapContainer: {
-    flex: 1,
     position: 'relative',
+    flex: 1,
+    border: `1px solid ${tokens.colorNeutralStroke1}`,
     borderRadius: tokens.borderRadiusMedium,
     overflow: 'hidden',
     backgroundColor: tokens.colorNeutralBackground2,
-    border: `1px solid ${tokens.colorNeutralStroke1}`,
     cursor: 'grab',
-    userSelect: 'none',
-    minHeight: '300px',
   },
   mapContainerPanning: {
     cursor: 'grabbing',
@@ -110,12 +131,12 @@ const useStyles = makeStyles({
     position: 'absolute',
     top: 0,
     left: 0,
+    width: '100%',
+    height: '100%',
     transformOrigin: '0 0',
-    transition: 'transform 0.3s cubic-bezier(0.4, 0, 0.2, 1)',
-    willChange: 'transform',
-  },
-  mapWrapperPanning: {
-    transition: 'none',
+    pointerEvents: 'none',
+    zIndex: 1,
+    transition: 'transform 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
   },
   mapImage: {
     display: 'block',
@@ -123,59 +144,54 @@ const useStyles = makeStyles({
     height: 'auto',
     userSelect: 'none',
     pointerEvents: 'none',
-    draggable: 'false',
   },
-
-  // Desk markers
-  marker: {
+  markerLayer: {
     position: 'absolute',
-    width: '38px',
-    height: '38px',
+    top: 0,
+    left: 0,
+    width: '100%',
+    height: '100%',
+    pointerEvents: 'none',
+  },
+  imageWrapper: {
+    position: 'relative',
+    display: 'inline-block',
+    lineHeight: 0,
+  },
+  deskMarker: {
+    position: 'absolute',
+    width: '40px',
+    height: '40px',
     borderRadius: '50%',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
+    fontSize: '24px',
+    userSelect: 'none',
     pointerEvents: 'all',
-    cursor: 'pointer',
-    border: `3px solid rgba(255,255,255,0.9)`,
-    boxShadow: '0 2px 10px rgba(0,0,0,0.2)',
-    transition: 'transform 0.15s ease, box-shadow 0.15s ease',
-    transform: 'translate(-50%, -50%)',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.18)',
+    border: `3px solid ${tokens.colorNeutralBackground1}`,
+    transition: 'transform 0.1s ease, box-shadow 0.1s ease',
     ':hover': {
-      transform: 'translate(-50%, -50%) scale(1.18)',
-      boxShadow: '0 4px 20px rgba(0,0,0,0.3)',
-      zIndex: '50',
-    },
-  },
-  markerSelected: {
-    outline: '3px solid white',
-    outlineOffset: '2px',
-    transform: 'translate(-50%, -50%) scale(1.15)',
-    boxShadow: '0 6px 24px rgba(0,0,0,0.35)',
-    zIndex: '40',
-  },
-  markerDisabled: {
-    cursor: 'default',
-    opacity: 0.85,
-    ':hover': {
-      transform: 'translate(-50%, -50%)',
-      boxShadow: '0 2px 10px rgba(0,0,0,0.2)',
+      transform: 'scale(1.15)',
+      boxShadow: '0 4px 16px rgba(0,0,0,0.28)',
+      zIndex: '100',
     },
   },
 
-  // No-map empty state
-  noMap: {
+  // ── Empty map state ──
+  emptyMap: {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
     height: '100%',
     color: tokens.colorNeutralForeground3,
-    gap: tokens.spacingVerticalM,
     textAlign: 'center',
+    gap: tokens.spacingVerticalS,
   },
 
-  // Booking modal
+  // ── Booking modal ──
   bookingForm: {
     display: 'flex',
     flexDirection: 'column',
@@ -227,34 +243,16 @@ const useStyles = makeStyles({
     fontSize: tokens.fontSizeBase200,
     color: tokens.colorNeutralForeground2,
   },
-  maintenanceBanner: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: tokens.spacingHorizontalS,
-    padding: `${tokens.spacingVerticalS} ${tokens.spacingHorizontalM}`,
-    backgroundColor: tokens.colorPaletteMarigoldBackground1,
-    border: `1px solid ${tokens.colorPaletteMarigoldBorder1}`,
-    borderRadius: tokens.borderRadiusMedium,
-    color: tokens.colorPaletteMarigoldForeground1,
-    fontSize: tokens.fontSizeBase200,
-    fontWeight: tokens.fontWeightSemibold,
-    flexShrink: 0,
-  },
 });
 
-// ─── Helpers ─────────────────────────────────────────────────────────────────
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function todayStr() {
   return new Date().toISOString().slice(0, 10);
 }
 
 function toLocalTimeStr(isoDate: string) {
-  // "2025-02-18T09:00:00Z" → "09:00"
-  try {
-    return new Date(isoDate).toTimeString().slice(0, 5);
-  } catch {
-    return '';
-  }
+  try { return new Date(isoDate).toTimeString().slice(0, 5); } catch { return ''; }
 }
 
 function buildISO(date: string, time: string): string {
@@ -265,40 +263,6 @@ const HOUR_OPTIONS = Array.from({ length: 24 }, (_, i) => {
   const h = String(i).padStart(2, '0');
   return { value: `${h}:00`, label: `${h}:00` };
 });
-
-// ─── Marker colours ───────────────────────────────────────────────────────────
-
-function markerColor(desk: DeskLiveState, isSelected: boolean, myUserId?: number) {
-  if (isSelected) return '#f59e0b';                            // amber — selected
-  if (desk.is_locked) return '#f59e0b';                        // amber — locked by someone
-  if (desk.is_permanent && desk.permanent_assignee && desk.permanent_assignee !== myUserId) {
-    return '#a855f7';                                          // purple — permanently taken
-  }
-  if (desk.is_booked) {
-    if (desk.booked_by_id === myUserId) return '#3b82f6';      // blue — my booking
-    return '#ef4444';                                          // red — booked by other
-  }
-  return '#22c55e';                                            // green — available
-}
-
-function markerTitle(desk: DeskLiveState, myUserId?: number) {
-  if (desk.is_locked) return `${desk.name} — locked by ${desk.locked_by ?? 'someone'}`;
-  if (desk.is_permanent && desk.permanent_assignee && desk.permanent_assignee !== myUserId) {
-    return `${desk.name} — permanent desk`;
-  }
-  if (desk.is_booked) {
-    if (desk.booked_by_id === myUserId) return `${desk.name} — your booking`;
-    return `${desk.name} — booked by ${desk.booked_by ?? 'someone'}`;
-  }
-  return `${desk.name} — available`;
-}
-
-function canBook(desk: DeskLiveState, myUserId?: number) {
-  if (desk.is_locked && desk.locked_by_id !== myUserId) return false;
-  if (desk.is_booked && desk.booked_by_id !== myUserId) return false;
-  if (desk.is_permanent && desk.permanent_assignee && desk.permanent_assignee !== myUserId) return false;
-  return true;
-}
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -322,8 +286,37 @@ interface DeskLiveState {
 export interface RoomMapViewerProps {
   room: RoomWithDesks;
   onClose?: () => void;
-  /** Called after a booking is created or cancelled so parent can update stats */
   onBookingChange?: () => void;
+}
+
+// ─── Marker helpers ───────────────────────────────────────────────────────────
+
+function markerColor(desk: DeskLiveState, isSelected: boolean, myUserId?: number): string {
+  if (isSelected) return '#f59e0b';
+  if (desk.is_locked) return '#f59e0b';
+  if (desk.is_permanent && desk.permanent_assignee && desk.permanent_assignee !== myUserId)
+    return '#a855f7';
+  if (desk.is_booked)
+    return desk.booked_by_id === myUserId ? '#3b82f6' : '#ef4444';
+  return '#22c55e';
+}
+
+function markerTitle(desk: DeskLiveState, myUserId?: number): string {
+  if (desk.is_locked) return `${desk.name} — locked by ${desk.locked_by ?? 'someone'}`;
+  if (desk.is_permanent && desk.permanent_assignee && desk.permanent_assignee !== myUserId)
+    return `${desk.name} — permanent desk`;
+  if (desk.is_booked)
+    return desk.booked_by_id === myUserId
+      ? `${desk.name} — your booking`
+      : `${desk.name} — booked by ${desk.booked_by ?? 'someone'}`;
+  return `${desk.name} — available`;
+}
+
+function canBook(desk: DeskLiveState, myUserId?: number): boolean {
+  if (desk.is_locked && desk.locked_by_id !== myUserId) return false;
+  if (desk.is_booked && desk.booked_by_id !== myUserId) return false;
+  if (desk.is_permanent && desk.permanent_assignee && desk.permanent_assignee !== myUserId) return false;
+  return true;
 }
 
 // ─── Booking Modal ────────────────────────────────────────────────────────────
@@ -357,21 +350,14 @@ const BookingModal: React.FC<BookingModalProps> = ({
   const handleConfirm = async () => {
     if (!desk) return;
     if (startTime >= endTime) { setError('End time must be after start time.'); return; }
-    setSaving(true);
-    setError(null);
-    try {
-      await onConfirm(date, startTime, endTime);
-    } catch (err: any) {
-      setError(err.message || 'Failed to book desk.');
-    } finally {
-      setSaving(false);
-    }
+    setSaving(true); setError(null);
+    try { await onConfirm(date, startTime, endTime); }
+    catch (err: any) { setError(err.message || 'Failed to book desk.'); }
+    finally { setSaving(false); }
   };
 
-  const myBookingOnThisDesk = existingBookings.find(b => b.user === myUserId);
   const otherBookings = existingBookings.filter(b => b.user !== myUserId);
   const isMyDesk = desk?.booked_by_id === myUserId;
-
   if (!desk) return null;
 
   return (
@@ -379,35 +365,26 @@ const BookingModal: React.FC<BookingModalProps> = ({
       <DialogSurface style={{ maxWidth: '480px', width: '90vw' }}>
         <DialogBody>
           <DialogTitle
-            action={
-              <Button appearance="subtle" icon={<Dismiss24Regular />} onClick={onClose} disabled={saving} />
-            }
+            action={<Button appearance="subtle" icon={<Dismiss24Regular />} onClick={onClose} disabled={saving} />}
           >
             {isMyDesk ? 'Your Booking' : 'Book Desk'}
           </DialogTitle>
-
           <DialogContent>
             <div className={styles.bookingForm}>
 
-              {/* Desk info */}
               <div className={styles.bookingDeskInfo}>
-                <div
-                  className={styles.bookingDeskDot}
-                  style={{ backgroundColor: isMyDesk ? '#3b82f6' : '#22c55e' }}
-                />
+                <div className={styles.bookingDeskDot}
+                  style={{ backgroundColor: isMyDesk ? '#3b82f6' : '#22c55e' }} />
                 <div>
-                  <Text weight="semibold" size={400}>{desk.name}</Text>
-                  <br />
+                  <Text weight="semibold" size={400}>{desk.name}</Text><br />
                   <Text size={200} style={{ color: tokens.colorNeutralForeground3 }}>
                     {roomName}
                     {desk.is_permanent && desk.permanent_assignee_full_name &&
-                      ` · Permanent: ${desk.permanent_assignee_full_name}`
-                    }
+                      ` · Permanent: ${desk.permanent_assignee_full_name}`}
                   </Text>
                 </div>
               </div>
 
-              {/* Existing bookings on this desk today */}
               {loadingBookings ? (
                 <Spinner size="tiny" label="Checking availability…" />
               ) : otherBookings.length > 0 && (
@@ -429,12 +406,9 @@ const BookingModal: React.FC<BookingModalProps> = ({
                 </div>
               )}
 
-              {/* Booking form */}
               <Field label="Date" required>
                 <Input
-                  type="date"
-                  value={date}
-                  min={todayStr()}
+                  type="date" value={date} min={todayStr()}
                   onChange={(_, d) => setDate(d.value)}
                   contentBefore={<CalendarLtr20Regular />}
                   disabled={saving}
@@ -443,25 +417,15 @@ const BookingModal: React.FC<BookingModalProps> = ({
 
               <div className={styles.fieldRow}>
                 <Field label="Start time" required>
-                  <Select
-                    value={startTime}
-                    onChange={(_, d) => setStartTime(d.value)}
-                    disabled={saving}
-                  >
-                    {HOUR_OPTIONS.map(o => (
-                      <option key={o.value} value={o.value}>{o.label}</option>
-                    ))}
+                  <Select value={startTime} onChange={(_, d) => setStartTime(d.value)} disabled={saving}>
+                    {HOUR_OPTIONS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
                   </Select>
                 </Field>
                 <Field label="End time" required>
-                  <Select
-                    value={endTime}
-                    onChange={(_, d) => setEndTime(d.value)}
-                    disabled={saving}
-                  >
-                    {HOUR_OPTIONS.filter(o => o.value > startTime).map(o => (
+                  <Select value={endTime} onChange={(_, d) => setEndTime(d.value)} disabled={saving}>
+                    {HOUR_OPTIONS.filter(o => o.value > startTime).map(o =>
                       <option key={o.value} value={o.value}>{o.label}</option>
-                    ))}
+                    )}
                   </Select>
                 </Field>
               </div>
@@ -474,11 +438,8 @@ const BookingModal: React.FC<BookingModalProps> = ({
               )}
             </div>
           </DialogContent>
-
           <DialogActions>
-            <Button appearance="secondary" onClick={onClose} disabled={saving}>
-              Cancel
-            </Button>
+            <Button appearance="secondary" onClick={onClose} disabled={saving}>Cancel</Button>
             <Button appearance="primary" onClick={handleConfirm} disabled={saving}>
               {saving ? <Spinner size="tiny" /> : 'Confirm Booking'}
             </Button>
@@ -491,34 +452,40 @@ const BookingModal: React.FC<BookingModalProps> = ({
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export const RoomMapViewer: React.FC<RoomMapViewerProps> = ({
-  room,
-  onClose,
-  onBookingChange,
-}) => {
+export const RoomMapViewer: React.FC<RoomMapViewerProps> = ({ room, onClose, onBookingChange }) => {
   const styles = useStyles();
   const { authenticatedFetch, user } = useAuth();
   const bookingApi = createBookingApi(authenticatedFetch);
   const myUserId = user?.id as number | undefined;
 
-  // ── Live desk state (base from room prop, updated by WS) ──
+  // ── Live desk state ──
   const [desks, setDesks] = useState<DeskLiveState[]>([]);
 
-  // ── Zoom / Pan ──
+  // ── Zoom / pan — identical refs/state to ManageDesksModal ──
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
-  const panStartRef = useRef({ x: 0, y: 0 });
-  const isZoomedRef = useRef(false);
+  const [panStart, setPanStart] = useState({ x: 0, y: 0 });
   const mapContainerRef = useRef<HTMLDivElement>(null);
-  const mapImageRef = useRef<HTMLImageElement>(null);
+  const mapWrapperRef   = useRef<HTMLDivElement>(null);
+  const mapImageRef     = useRef<HTMLImageElement>(null);
+  const imageWrapperRef = useRef<HTMLDivElement>(null);
+  const isZoomedToDeskRef = useRef(false);
 
-  // ── Selection / Booking ──
+  // ── Selection / delayed menu ──
   const [selectedDeskId, setSelectedDeskId] = useState<number | null>(null);
+  const [menuReadyDeskId, setMenuReadyDeskId] = useState<number | null>(null);
+  const menuReadyTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // ── Maintenance state (seeded from room prop, kept live via WS) ──
+  const [isMaintenance, setIsMaintenance] = useState<boolean>(!!(room as any).is_under_maintenance);
+  const [maintenanceBy, setMaintenanceBy] = useState<string | null>((room as any).maintenance_by_name || null);
+
+  // ── Booking ──
   const [bookingModalOpen, setBookingModalOpen] = useState(false);
   const [deskBookings, setDeskBookings] = useState<Booking[]>([]);
   const [loadingBookings, setLoadingBookings] = useState(false);
-  const lockRefreshRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lockRefreshRef  = useRef<ReturnType<typeof setInterval> | null>(null);
   const lockedDeskIdRef = useRef<number | null>(null);
 
   // ── Init desks from room prop ──
@@ -541,33 +508,52 @@ export const RoomMapViewer: React.FC<RoomMapViewerProps> = ({
         permanent_assignee_full_name: d.permanent_assignee_full_name ?? null,
       }))
     );
-    // Reset view when room changes
     setSelectedDeskId(null);
+    setMenuReadyDeskId(null);
     setBookingModalOpen(false);
     setZoom(1);
     setPan({ x: 0, y: 0 });
-    isZoomedRef.current = false;
+    isZoomedToDeskRef.current = false;
   }, [room.id]);
 
-  // ── Center image on load ──
+  // ── Center image on load — verbatim from ManageDesksModal ──
   useEffect(() => {
     if (!room.map_image) return;
-    const img = mapImageRef.current;
+    const image = mapImageRef.current;
     const container = mapContainerRef.current;
-    if (!img || !container) return;
+    if (!image || !container) return;
 
     const setup = () => {
-      const cw = container.clientWidth;
-      const ch = container.clientHeight;
-      setPan({
-        x: (cw - img.naturalWidth)  / 2,
-        y: (ch - img.naturalHeight) / 2,
-      });
+      if (!image.naturalWidth || !image.naturalHeight) return;
+      const containerW = container.clientWidth;
+      const containerH = container.clientHeight;
+      const centeredPanX = (containerW - image.naturalWidth)  / 2;
+      const centeredPanY = (containerH - image.naturalHeight) / 2;
+      setZoom(1);
+      setPan({ x: centeredPanX, y: centeredPanY });
     };
 
-    if (img.complete && img.naturalWidth) setup();
-    else img.onload = setup;
+    if (image.complete) setup();
+    else image.onload = setup;
   }, [room.map_image, room.id]);
+
+  // ── Resize re-center — verbatim from ManageDesksModal ──
+  useEffect(() => {
+    const handleResize = () => {
+      if (isZoomedToDeskRef.current) return;
+      const image = mapImageRef.current;
+      const container = mapContainerRef.current;
+      if (!image || !container || !image.naturalWidth) return;
+      const containerW = container.clientWidth;
+      const containerH = container.clientHeight;
+      setPan({
+        x: (containerW - image.naturalWidth)  / 2,
+        y: (containerH - image.naturalHeight) / 2,
+      });
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // ── WebSocket ──
   useEffect(() => {
@@ -586,13 +572,13 @@ export const RoomMapViewer: React.FC<RoomMapViewerProps> = ({
               ? { ...d, is_locked: data.locked, locked_by: data.locked_by ?? null }
               : d
           ));
+        } else if (data.type === 'room_maintenance') {
+          setIsMaintenance(data.enabled);
+          setMaintenanceBy(data.enabled ? (data.by ?? null) : null);
         }
       },
     });
-
-    return () => {
-      websocketService.closeConnection(`room_${room.id}`);
-    };
+    return () => websocketService.closeConnection(`room_${room.id}`);
   }, [room.id]);
 
   // ── Cleanup lock on unmount ──
@@ -606,88 +592,121 @@ export const RoomMapViewer: React.FC<RoomMapViewerProps> = ({
     };
   }, []);
 
-  // ── Zoom helpers ──
-  const zoomToward = useCallback((clientX: number, clientY: number, newZoom: number) => {
+  // ── Zoom / pan handlers — verbatim from ManageDesksModal ──
+  const zoomToward = (clientX: number, clientY: number, newZoom: number) => {
     const container = mapContainerRef.current;
     if (!container) return;
-    const rect = container.getBoundingClientRect();
-    const ox = clientX - rect.left;
-    const oy = clientY - rect.top;
-    const imgX = (ox - pan.x) / zoom;
-    const imgY = (oy - pan.y) / zoom;
+    const rect    = container.getBoundingClientRect();
+    const offsetX = clientX - rect.left;
+    const offsetY = clientY - rect.top;
+    const imageX  = (offsetX - pan.x) / zoom;
+    const imageY  = (offsetY - pan.y) / zoom;
     setZoom(newZoom);
-    setPan({ x: ox - imgX * newZoom, y: oy - imgY * newZoom });
-  }, [pan, zoom]);
+    setPan({ x: offsetX - imageX * newZoom, y: offsetY - imageY * newZoom });
+  };
 
-  const zoomToDesk = useCallback((deskId: number) => {
+  const zoomToDesk = (deskId: number) => {
     const desk = desks.find(d => d.id === deskId);
-    const img = mapImageRef.current;
+    if (!desk) return;
+    const image     = mapImageRef.current;
     const container = mapContainerRef.current;
-    if (!desk || !img || !container) return;
+    if (!image || !container) return;
 
-    const cw = container.clientWidth;
-    const ch = container.clientHeight;
-    const nw = img.naturalWidth;
-    const nh = img.naturalHeight;
-    const imgOffX = (cw - nw) / 2;
-    const imgOffY = (ch - nh) / 2;
-    const deskX = imgOffX + desk.pos_x * nw;
-    const deskY = imgOffY + desk.pos_y * nh;
-    const t = 2.5;
+    const containerW  = container.clientWidth;
+    const containerH  = container.clientHeight;
+    const naturalW    = image.naturalWidth;
+    const naturalH    = image.naturalHeight;
+    const deskLocalX  = desk.pos_x * naturalW;
+    const deskLocalY  = desk.pos_y * naturalH;
+    const targetZoom  = 2.5;
 
-    isZoomedRef.current = true;
-    setZoom(t);
-    setPan({ x: cw / 2 - deskX * t, y: ch / 2 - deskY * t });
-  }, [desks]);
+    isZoomedToDeskRef.current = true;
+    setZoom(targetZoom);
+    setPan({
+      x: containerW / 2 - deskLocalX * targetZoom,
+      y: containerH / 2 - deskLocalY * targetZoom,
+    });
+  };
+
+  const handleZoomIn = () => {
+    isZoomedToDeskRef.current = false;
+    zoomToward(
+      (mapContainerRef.current?.getBoundingClientRect().left ?? 0) + (mapContainerRef.current?.offsetWidth  ?? 0) / 2,
+      (mapContainerRef.current?.getBoundingClientRect().top  ?? 0) + (mapContainerRef.current?.offsetHeight ?? 0) / 2,
+      Math.min(zoom + 0.25, 4)
+    );
+  };
+
+  const handleZoomOut = () => {
+    isZoomedToDeskRef.current = false;
+    zoomToward(
+      (mapContainerRef.current?.getBoundingClientRect().left ?? 0) + (mapContainerRef.current?.offsetWidth  ?? 0) / 2,
+      (mapContainerRef.current?.getBoundingClientRect().top  ?? 0) + (mapContainerRef.current?.offsetHeight ?? 0) / 2,
+      Math.max(zoom - 0.25, 0.25)
+    );
+  };
 
   const handleResetView = useCallback(() => {
-    const img = mapImageRef.current;
+    const image     = mapImageRef.current;
     const container = mapContainerRef.current;
-    if (!img || !container || !img.naturalWidth) return;
-    const cw = container.clientWidth;
-    const ch = container.clientHeight;
-    isZoomedRef.current = false;
+    if (!image || !container || !image.naturalWidth) return;
+    const containerW = container.clientWidth;
+    const containerH = container.clientHeight;
+    isZoomedToDeskRef.current = false;
     setZoom(1);
-    setPan({ x: (cw - img.naturalWidth) / 2, y: (ch - img.naturalHeight) / 2 });
+    setPan({
+      x: (containerW - image.naturalWidth)  / 2,
+      y: (containerH - image.naturalHeight) / 2,
+    });
   }, []);
 
-  const handleZoomIn  = () => { isZoomedRef.current = false; zoomToward(
-    (mapContainerRef.current?.getBoundingClientRect().left ?? 0) + (mapContainerRef.current?.offsetWidth ?? 0) / 2,
-    (mapContainerRef.current?.getBoundingClientRect().top  ?? 0) + (mapContainerRef.current?.offsetHeight ?? 0) / 2,
-    Math.min(zoom + 0.25, 4)
-  ); };
-  const handleZoomOut = () => { isZoomedRef.current = false; zoomToward(
-    (mapContainerRef.current?.getBoundingClientRect().left ?? 0) + (mapContainerRef.current?.offsetWidth ?? 0) / 2,
-    (mapContainerRef.current?.getBoundingClientRect().top  ?? 0) + (mapContainerRef.current?.offsetHeight ?? 0) / 2,
-    Math.max(zoom - 0.25, 0.25)
-  ); };
-
-  // ── Pan handlers ──
-  const handleMouseDown = (e: React.MouseEvent) => {
-    if (e.button !== 0) return;
-    setIsPanning(true);
-    panStartRef.current = { x: e.clientX - pan.x, y: e.clientY - pan.y };
-  };
-  const handleMouseMove = (e: React.MouseEvent) => {
-    if (!isPanning) return;
-    setPan({ x: e.clientX - panStartRef.current.x, y: e.clientY - panStartRef.current.y });
-  };
-  const handleMouseUp = () => setIsPanning(false);
   const handleWheel = (e: React.WheelEvent) => {
     e.preventDefault();
-    isZoomedRef.current = false;
-    const delta = e.deltaY > 0 ? -0.15 : 0.15;
-    zoomToward(e.clientX, e.clientY, Math.max(0.25, Math.min(4, zoom + delta)));
+    isZoomedToDeskRef.current = false;
+    const delta   = e.deltaY > 0 ? -0.15 : 0.15;
+    const newZoom = Math.max(0.25, Math.min(4, zoom + delta));
+    zoomToward(e.clientX, e.clientY, newZoom);
   };
 
-  // ── Desk click → lock → open modal ──
-  const handleDeskClick = async (desk: DeskLiveState) => {
-    if (!canBook(desk, myUserId)) return;
+  const handleMapMouseDown = (e: React.MouseEvent) => {
+    setIsPanning(true);
+    setPanStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
+  };
 
+  const handleMapMouseMove = (e: React.MouseEvent) => {
+    if (!isPanning) return;
+    setPan({ x: e.clientX - panStart.x, y: e.clientY - panStart.y });
+  };
+
+  const handleMapMouseUp = () => setIsPanning(false);
+
+  // ── Marker click: zoom first, reveal menu after animation settles ──
+  const handleMarkerClick = (desk: DeskLiveState, e: React.MouseEvent) => {
+    e.stopPropagation();
+    // Second click on the same desk closes everything
+    if (menuReadyDeskId === desk.id || selectedDeskId === desk.id) {
+      if (menuReadyTimerRef.current) clearTimeout(menuReadyTimerRef.current);
+      setMenuReadyDeskId(null);
+      setSelectedDeskId(null);
+      handleResetView();
+      return;
+    }
+    if (menuReadyTimerRef.current) clearTimeout(menuReadyTimerRef.current);
     setSelectedDeskId(desk.id);
     zoomToDesk(desk.id);
+    // Delay menu appearance until CSS transition finishes (0.35 s + small buffer)
+    menuReadyTimerRef.current = setTimeout(() => setMenuReadyDeskId(desk.id), 380);
+  };
 
-    // Fetch today's bookings for this desk
+  const handleMenuClose = () => {
+    if (menuReadyTimerRef.current) clearTimeout(menuReadyTimerRef.current);
+    setMenuReadyDeskId(null);
+    setSelectedDeskId(null);
+    handleResetView();
+  };
+
+  // ── "Book Desk" menu item → acquire lock → open booking modal ──
+  const handleBookDesk = async (desk: DeskLiveState) => {
     setLoadingBookings(true);
     setDeskBookings([]);
     try {
@@ -699,41 +718,35 @@ export const RoomMapViewer: React.FC<RoomMapViewerProps> = ({
       setLoadingBookings(false);
     }
 
-    // Lock the desk
     const lockResult = await bookingApi.lockDesk(desk.id);
     if (!lockResult.ok) {
-      // Already locked by someone else — still show modal but disable booking
       setDesks(prev => prev.map(d =>
         d.id === desk.id ? { ...d, is_locked: true, locked_by: lockResult.locked_by } : d
       ));
     } else {
       lockedDeskIdRef.current = desk.id;
-      // Refresh lock every 25 seconds
       if (lockRefreshRef.current) clearInterval(lockRefreshRef.current);
-      lockRefreshRef.current = setInterval(() => {
-        bookingApi.refreshLock(desk.id).catch(() => {});
-      }, 25_000);
+      lockRefreshRef.current = setInterval(() => bookingApi.refreshLock(desk.id).catch(() => {}), 25_000);
     }
-
     setBookingModalOpen(true);
   };
 
-  // ── Confirm booking ──
   const handleConfirmBooking = async (date: string, startTime: string, endTime: string) => {
     if (!selectedDeskId) return;
-    const startISO = buildISO(date, startTime);
-    const endISO   = buildISO(date, endTime);
-    await bookingApi.createBooking({ desk_id: selectedDeskId, start_time: startISO, end_time: endISO });
+    await bookingApi.createBooking({
+      desk_id: selectedDeskId,
+      start_time: buildISO(date, startTime),
+      end_time:   buildISO(date, endTime),
+    });
     handleCloseBookingModal();
     onBookingChange?.();
   };
 
-  // ── Close booking modal → release lock ──
   const handleCloseBookingModal = useCallback(() => {
     setBookingModalOpen(false);
+    setMenuReadyDeskId(null);
     setSelectedDeskId(null);
     handleResetView();
-
     if (lockRefreshRef.current) { clearInterval(lockRefreshRef.current); lockRefreshRef.current = null; }
     if (lockedDeskIdRef.current !== null) {
       bookingApi.unlockDesk(lockedDeskIdRef.current).catch(() => {});
@@ -741,12 +754,14 @@ export const RoomMapViewer: React.FC<RoomMapViewerProps> = ({
     }
   }, [handleResetView]);
 
-  // ─── Derived ──
-  const hasMap = !!room.map_image;
-  const desksWithPos = desks.filter(d => d.pos_x !== null && d.pos_y !== null);
-  const availableCount = desks.filter(d => !d.is_booked && !d.is_locked && (!d.is_permanent || d.permanent_assignee === myUserId)).length;
+  // ── Derived ──
+  const desksWithPos   = desks.filter(d => d.pos_x !== null && d.pos_y !== null);
+  const availableCount = desks.filter(d =>
+    !d.is_booked && !d.is_locked && (!d.is_permanent || d.permanent_assignee === myUserId)
+  ).length;
   const selectedDesk = desks.find(d => d.id === selectedDeskId) ?? null;
-  const isMaintenance = (room as any).is_under_maintenance;
+
+  // ─────────────────────────────────────────────────────────────────────────────
 
   return (
     <div className={styles.root}>
@@ -758,17 +773,20 @@ export const RoomMapViewer: React.FC<RoomMapViewerProps> = ({
           <div className={styles.roomSubtitle}>
             {room.floor?.location_name} · {room.floor?.name}
             {' · '}
-            <span style={{ color: availableCount > 0 ? tokens.colorPaletteGreenForeground1 : tokens.colorNeutralForeground3 }}>
+            <span style={{
+              color: availableCount > 0
+                ? tokens.colorPaletteGreenForeground1
+                : tokens.colorNeutralForeground3,
+            }}>
               {availableCount} available
             </span>
-            {' of '}
-            {desks.length} desks
+            {' of '}{desks.length} desks
           </div>
         </div>
-
         <div className={styles.mapControls}>
           <Button appearance="subtle" icon={<SubtractSquare20Regular />} size="small"
             onClick={handleZoomOut} disabled={zoom <= 0.25} title="Zoom out" />
+          <Text size={200}>{Math.round(zoom * 100)}%</Text>
           <Button appearance="subtle" icon={<AddSquare20Regular />} size="small"
             onClick={handleZoomIn} disabled={zoom >= 4} title="Zoom in" />
           <Button appearance="subtle" icon={<ArrowCounterclockwise20Regular />} size="small"
@@ -783,8 +801,12 @@ export const RoomMapViewer: React.FC<RoomMapViewerProps> = ({
       {/* Maintenance banner */}
       {isMaintenance && (
         <div className={styles.maintenanceBanner}>
-          <Warning20Regular />
-          This room is currently under maintenance — booking is unavailable.
+          <Warning20Regular style={{ flexShrink: 0 }} />
+          <span>
+            <strong>Under Maintenance</strong>
+            {maintenanceBy ? `, issued by ${maintenanceBy}` : ''}
+            {'. Booking is currently unavailable. Please contact them.'}
+          </span>
         </div>
       )}
 
@@ -805,88 +827,118 @@ export const RoomMapViewer: React.FC<RoomMapViewerProps> = ({
       </div>
 
       {/* Map */}
-      {!hasMap ? (
-        <div className={styles.noMap}>
-          <Text size={400} weight="semibold">No floor map uploaded</Text>
-          <Text size={200}>A room manager needs to upload a map for this room.</Text>
+      {!room.map_image ? (
+        <div className={styles.mapContainer}>
+          <div className={styles.emptyMap}>
+            <Text size={300}>No floor map uploaded</Text>
+            <Text size={200}>A room manager needs to upload a map for this room.</Text>
+          </div>
         </div>
       ) : (
         <div
           ref={mapContainerRef}
           className={`${styles.mapContainer} ${isPanning ? styles.mapContainerPanning : ''}`}
-          onMouseDown={handleMouseDown}
-          onMouseMove={handleMouseMove}
-          onMouseUp={handleMouseUp}
-          onMouseLeave={handleMouseUp}
+          onMouseDown={handleMapMouseDown}
+          onMouseMove={handleMapMouseMove}
+          onMouseUp={handleMapMouseUp}
+          onMouseLeave={handleMapMouseUp}
           onWheel={handleWheel}
         >
+          {/* Zoom/pan transform wrapper — verbatim from ManageDesksModal */}
           <div
-            ref={undefined}
-            className={`${styles.mapWrapper} ${isPanning ? styles.mapWrapperPanning : ''}`}
-            style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})` }}
+            ref={mapWrapperRef}
+            className={styles.mapWrapper}
+            style={{
+              transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+              transition: isPanning ? 'none' : undefined,
+            }}
           >
-            {/* Image */}
-            <img
-              ref={mapImageRef}
-              src={room.map_image!}
-              alt={`${room.name} floor map`}
-              className={styles.mapImage}
-              draggable={false}
-            />
+            {/* markerLayer centres imageWrapper inside the full-size wrapper */}
+            <div className={styles.markerLayer}>
+              {/* imageWrapper is inline-block — its dimensions exactly match
+                  the rendered image. Marker left/top % are relative to this. */}
+              <div ref={imageWrapperRef} className={styles.imageWrapper}>
+                <img
+                  ref={mapImageRef}
+                  src={room.map_image}
+                  alt="Room map"
+                  className={styles.mapImage}
+                  draggable={false}
+                />
 
-            {/* Desk markers — positioned relative to the image's natural dimensions */}
-            {mapImageRef.current && desksWithPos.map(desk => {
-              const img = mapImageRef.current!;
-              const nw = img.naturalWidth  || 1;
-              const nh = img.naturalHeight || 1;
-              const isSelected = selectedDeskId === desk.id;
-              const bookable   = canBook(desk, myUserId) && !isMaintenance;
-              const color      = markerColor(desk, isSelected, myUserId);
+                {desksWithPos.map(desk => {
+                  const isSelected = selectedDeskId === desk.id;
+                  const isMenuOpen = menuReadyDeskId === desk.id;
+                  const bookable   = canBook(desk, myUserId) && !isMaintenance;
+                  const color      = markerColor(desk, isSelected, myUserId);
 
-              return (
-                <Tooltip
-                  key={desk.id}
-                  content={markerTitle(desk, myUserId)}
-                  relationship="label"
-                >
-                  <div
-                    style={{
-                      position: 'absolute',
-                      left: `${desk.pos_x * nw}px`,
-                      top:  `${desk.pos_y * nh}px`,
-                      transform: 'translate(-50%, -50%)',
-                      width: '38px',
-                      height: '38px',
-                      borderRadius: '50%',
-                      backgroundColor: color,
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      pointerEvents: 'all',
-                      cursor: bookable ? 'pointer' : 'default',
-                      border: `3px solid rgba(255,255,255,0.9)`,
-                      boxShadow: isSelected
-                        ? '0 0 0 3px white, 0 6px 24px rgba(0,0,0,0.35)'
-                        : '0 2px 10px rgba(0,0,0,0.2)',
-                      transition: 'transform 0.15s ease, box-shadow 0.15s ease',
-                      zIndex: isSelected ? 40 : 10,
-                      opacity: bookable || isSelected ? 1 : 0.85,
-                    }}
-                    onClick={e => { e.stopPropagation(); if (bookable) handleDeskClick(desk); }}
-                    onMouseDown={e => e.stopPropagation()} // don't trigger pan
-                  >
-                    {desk.is_locked
-                      ? <LockClosed20Filled style={{ color: '#fff', fontSize: '18px' }} />
-                      : desk.is_permanent
-                      ? <Star20Filled style={{ color: '#fff', fontSize: '18px' }} />
-                      : desk.is_booked && desk.booked_by_id === myUserId
-                      ? <Checkmark20Filled style={{ color: '#fff', fontSize: '18px' }} />
-                      : <Person24Filled style={{ color: '#fff', fontSize: '18px' }} />
-                    }
-                  </div>
-                </Tooltip>
-              );
-            })}
+                  return (
+                    <div
+                      key={desk.id}
+                      style={{
+                        position: 'absolute',
+                        left: `${desk.pos_x * 100}%`,
+                        top:  `${desk.pos_y * 100}%`,
+                        transform: 'translate(-50%, -50%)',
+                        zIndex: isSelected ? 20 : 10,
+                        cursor: 'pointer',
+                        pointerEvents: 'all',
+                      }}
+                      onMouseDown={e => e.stopPropagation()}
+                    >
+                      <Menu
+                        open={isMenuOpen}
+                        onOpenChange={(_, d) => { if (!d.open) handleMenuClose(); }}
+                      >
+                        <MenuTrigger disableButtonEnhancement>
+                          <Tooltip content={markerTitle(desk, myUserId)} relationship="label">
+                            <div
+                              className={styles.deskMarker}
+                              onClick={e => handleMarkerClick(desk, e)}
+                              style={{
+                                backgroundColor: color,
+                                color: '#ffffff',
+                                outline: isSelected ? '3px solid #f59e0b' : 'none',
+                                outlineOffset: '2px',
+                              }}
+                            >
+                              {desk.is_locked
+                                ? <LockClosed20Filled />
+                                : desk.is_permanent
+                                ? <Star20Filled />
+                                : desk.is_booked && desk.booked_by_id === myUserId
+                                ? <Checkmark20Filled />
+                                : <Person24Filled />
+                              }
+                            </div>
+                          </Tooltip>
+                        </MenuTrigger>
+                        <MenuPopover>
+                          <MenuList>
+                            {bookable ? (
+                              <MenuItem
+                                icon={<CalendarAdd20Regular />}
+                                onClick={() => handleBookDesk(desk)}
+                              >
+                                {desk.is_booked && desk.booked_by_id === myUserId
+                                  ? 'Manage Booking' : 'Book Desk'}
+                              </MenuItem>
+                            ) : (
+                              <MenuItem icon={<CalendarCancel20Regular />} disabled>
+                                {desk.is_locked
+                                  ? `Locked by ${desk.locked_by ?? 'someone'}`
+                                  : desk.is_permanent ? 'Permanently assigned'
+                                  : 'Unavailable'}
+                              </MenuItem>
+                            )}
+                          </MenuList>
+                        </MenuPopover>
+                      </Menu>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
           </div>
         </div>
       )}
