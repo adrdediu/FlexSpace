@@ -40,12 +40,9 @@ export interface Desk {
   is_locked: boolean;
   locked_by?: string;
   is_permanent: boolean;
-  permanent_assignee?: string;
-  permanent_user?: {
-    id: number;
-    username: string;
-    full_name: string;
-  };
+  permanent_assignee?: number | null;           // user ID (writable)
+  permanent_assignee_username?: string | null;  // read-only display
+  permanent_assignee_full_name?: string | null; // read-only display
   room: number;
   room_name?: string;
   orientation: 'top' | 'bottom' | 'left' | 'right';

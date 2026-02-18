@@ -14,9 +14,8 @@ import {
   tokens,
   Spinner,
   Badge,
-  Tooltip,
-  MenuPopover,
   Menu,
+  MenuPopover,
   MenuList,
   MenuItem,
   MenuTrigger,
@@ -27,13 +26,14 @@ import {
   Checkmark20Regular,
   Person24Filled,
   LocationRegular,
-  EditRegular,
-  ArrowReset20Regular,
-  ZoomIn20Regular,
-  ZoomOut20Regular,
+  PersonTag20Regular,
+  AddSquare20Regular,
+  SubtractSquare20Regular,
+  ArrowCounterclockwise20Regular,
 } from '@fluentui/react-icons';
 import { type RoomWithDesks, type Desk } from '../../../services/roomApi';
 import { useAuth } from '../../../contexts/AuthContext';
+import { AssignPermanentModal } from './AssignPermanentModal';
 
 const useStyles = makeStyles({
   modalContent: {
@@ -42,7 +42,8 @@ const useStyles = makeStyles({
     height: '600px',
   },
   leftPanel: {
-    width: '300px',
+    width: '260px',
+    flexShrink: 0,
     display: 'flex',
     flexDirection: 'column',
     gap: tokens.spacingVerticalM,
@@ -53,10 +54,12 @@ const useStyles = makeStyles({
     flex: 1,
     display: 'flex',
     flexDirection: 'column',
-    gap: tokens.spacingVerticalM,
+    gap: tokens.spacingVerticalS,
+    minWidth: 0,
   },
   mapControls: {
     display: 'flex',
+    alignItems: 'center',
     gap: tokens.spacingHorizontalS,
     justifyContent: 'flex-end',
   },
@@ -79,13 +82,42 @@ const useStyles = makeStyles({
     width: '100%',
     height: '100%',
     transformOrigin: '0 0',
+    pointerEvents: 'none',
+    zIndex: 1,
   },
-  mapImage: {
+  markersLayer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
     width: '100%',
     height: '100%',
-    objectFit: 'contain',
+    zIndex: 10,
+    pointerEvents: 'none', // layer itself is transparent; individual markers re-enable it
+  },
+  mapImage: {
+    display: 'block',
+    maxWidth: '100%',
+    maxHeight: '100%',
+    width: 'auto',
+    height: 'auto',
     userSelect: 'none',
     pointerEvents: 'none',
+  },
+  markerLayer: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    width: '100%',
+    height: '100%',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    pointerEvents: 'none',
+  },
+  imageWrapper: {
+    position: 'relative',
+    display: 'inline-block',
+    lineHeight: 0,
   },
   deskMarker: {
     position: 'absolute',
@@ -95,33 +127,30 @@ const useStyles = makeStyles({
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    cursor: 'move',
     fontSize: '24px',
-    transition: 'transform 0.1s ease, box-shadow 0.1s ease',
     userSelect: 'none',
-    boxShadow: `0 2px 8px rgba(0, 0, 0, 0.15)`,
+    pointerEvents: 'all',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.18)',
     border: `3px solid ${tokens.colorNeutralBackground1}`,
+    transition: 'transform 0.1s ease, box-shadow 0.1s ease',
     ':hover': {
-      transform: 'scale(1.2)',
-      boxShadow: `0 4px 16px rgba(0, 0, 0, 0.25)`,
+      transform: 'scale(1.15)',
+      boxShadow: '0 4px 16px rgba(0,0,0,0.28)',
       zIndex: '100',
     },
   },
   deskMarkerDragging: {
     transform: 'scale(1.25)',
-    boxShadow: `0 8px 24px rgba(0, 0, 0, 0.35)`,
+    boxShadow: '0 8px 24px rgba(0,0,0,0.35)',
     zIndex: '999',
+    cursor: 'move',
   },
-  saveButton: {
-    position: 'absolute',
-    top: '-40px',
-    left: '50%',
-    transform: 'translateX(-50%)',
-    padding: `${tokens.spacingVerticalXS} ${tokens.spacingHorizontalS}`,
-    minWidth: 'auto',
-    height: '28px',
-    fontSize: tokens.fontSizeBase200,
-    whiteSpace: 'nowrap',
+  deskItemSelected: {
+    backgroundColor: tokens.colorBrandBackground2,
+    borderColor: tokens.colorBrandStroke1,
+    ':hover': {
+      backgroundColor: tokens.colorBrandBackground2Hover,
+    },
   },
   desksList: {
     flex: 1,
@@ -134,7 +163,6 @@ const useStyles = makeStyles({
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: tokens.spacingVerticalS,
   },
   deskItem: {
     display: 'flex',
@@ -151,21 +179,35 @@ const useStyles = makeStyles({
   },
   deskInfo: {
     display: 'flex',
-    alignItems: 'center',
-    gap: tokens.spacingHorizontalS,
+    flexDirection: 'column',
+    gap: tokens.spacingVerticalXXS,
     flex: 1,
+    minWidth: 0,
+  },
+  deskNameRow: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: tokens.spacingHorizontalXS,
+    flexWrap: 'wrap',
   },
   deskName: {
     fontSize: tokens.fontSizeBase300,
     fontWeight: tokens.fontWeightSemibold,
   },
-  badgeContainer: {
+  deskAssignee: {
+    fontSize: tokens.fontSizeBase100,
+    color: tokens.colorNeutralForeground3,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
+  deskActions: {
     display: 'flex',
-    gap: tokens.spacingHorizontalXS,
+    gap: tokens.spacingHorizontalXXS,
+    flexShrink: 0,
   },
   addDeskSection: {
-    padding: tokens.spacingVerticalM,
-    paddingRight: 0,
+    paddingTop: tokens.spacingVerticalM,
     borderTop: `1px solid ${tokens.colorNeutralStroke2}`,
     display: 'flex',
     flexDirection: 'column',
@@ -201,6 +243,7 @@ const useStyles = makeStyles({
     height: '100%',
     color: tokens.colorNeutralForeground3,
     textAlign: 'center',
+    gap: tokens.spacingVerticalS,
   },
 });
 
@@ -213,8 +256,8 @@ interface ManageDesksModalProps {
 
 interface DeskPosition {
   id: number;
-  x: number; // Position as percentage (0-1) from left edge
-  y: number; // Position as percentage (0-1) from top edge
+  x: number; // 0-1, percentage from left edge of image
+  y: number; // 0-1, percentage from top edge of image
   saved: boolean;
 }
 
@@ -234,83 +277,236 @@ export const ManageDesksModal: React.FC<ManageDesksModalProps> = ({
   const [newDeskName, setNewDeskName] = useState('');
   const [draggingDeskId, setDraggingDeskId] = useState<number | null>(null);
   const [editingPositionDeskId, setEditingPositionDeskId] = useState<number | null>(null);
-  
-  // Zoom and pan state
+  const [assignPermanentDesk, setAssignPermanentDesk] = useState<Desk | null>(null);
+  const [selectedDeskId, setSelectedDeskId] = useState<number | null>(null);
+  // Ref map so we can imperatively open a specific marker's Menu
+  const markerRefs = useRef<Map<number, HTMLDivElement>>(new Map());
+
+  // Zoom and pan
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
-  
+  const [baseZoom, setBaseZoom] = useState(1);
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapWrapperRef = useRef<HTMLDivElement>(null);
+  const mapImageRef = useRef<HTMLImageElement>(null);
+  const imageWrapperRef = useRef<HTMLDivElement>(null);
   const dragOffsetRef = useRef({ x: 0, y: 0 });
   const initialLoadRef = useRef(true);
 
   const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
-  // Initialize desks and positions only once when modal opens
   useEffect(() => {
     if (open && room && initialLoadRef.current) {
       setDesks(room.desks || []);
-      const positions = new Map<DeskPosition>();
+      const positions = new Map<number, DeskPosition>();
       room.desks?.forEach(desk => {
         positions.set(desk.id, {
           id: desk.id,
-          x: desk.pos_x || 0.5,
-          y: desk.pos_y || 0.5,
+          x: desk.pos_x ?? 0.5,
+          y: desk.pos_y ?? 0.5,
           saved: true,
         });
       });
       setDeskPositions(positions);
       initialLoadRef.current = false;
+
+      // Lock room for bookings while admin is editing
+      authenticatedFetch(`${API_BASE_URL}/admin/rooms/${room.id}/set-maintenance/`, { method: 'POST' })
+        .catch(err => console.error('Failed to set maintenance mode:', err));
     }
-    
-    // Reset on close
     if (!open) {
       initialLoadRef.current = true;
       setZoom(1);
       setPan({ x: 0, y: 0 });
+      setEditingPositionDeskId(null);
+      setSelectedDeskId(null);
+
+      // Release maintenance lock when admin closes the modal
+      if (room?.id) {
+        authenticatedFetch(`${API_BASE_URL}/admin/rooms/${room.id}/clear-maintenance/`, { method: 'POST' })
+          .catch(err => console.error('Failed to clear maintenance mode:', err));
+      }
     }
   }, [open, room?.id]);
 
-  const handleZoomIn = () => {
-    setZoom(prev => Math.min(prev + 0.25, 3));
+useEffect(() => {
+  if (!open || !room?.map_image) return;
+
+  const image = mapImageRef.current;
+  const container = mapContainerRef.current;
+  if (!image || !container) return;
+
+  const setup = () => {
+    if (!image.naturalWidth || !image.naturalHeight) return;
+
+    const { zoom, panX, panY } = computeTopLeftFit(
+      container.clientWidth,
+      container.clientHeight,
+      image.naturalWidth,
+      image.naturalHeight
+    );
+
+    //setBaseZoom(zoom);
+    //setZoom(zoom);
+    setPan({ x: panX, y: panY });
   };
 
-  const handleZoomOut = () => {
-    setZoom(prev => Math.max(prev - 0.25, 0.5));
+  if (image.complete) setup();
+  else image.onload = setup;
+}, [open, room?.map_image]);
+
+
+useEffect(() => {
+  const handleResize = () => {
+    const image = mapImageRef.current;
+    const container = mapContainerRef.current;
+    if (!image || !container || !image.naturalWidth) return;
+
+    const { zoom, panX, panY } = computeTopLeftFit(
+      container.clientWidth,
+      container.clientHeight,
+      image.naturalWidth,
+      image.naturalHeight
+    );
+
+    //setBaseZoom(zoom);
+    //setZoom(zoom);
+    setPan({ x: panX, y: panY });
   };
 
-  const handleResetView = () => {
-    setZoom(1);
-    setPan({ x: 0, y: 0 });
-  };
+  window.addEventListener("resize", handleResize);
+  return () => window.removeEventListener("resize", handleResize);
+}, []);
 
-  const handleWheel = (e: React.WheelEvent) => {
-    e.preventDefault();
-    const delta = e.deltaY > 0 ? -0.1 : 0.1;
-    setZoom(prev => Math.max(0.5, Math.min(3, prev + delta)));
+
+
+function computeTopLeftFit(
+  containerW: number,
+  containerH: number,
+  naturalW: number,
+  naturalH: number
+) {
+  const fitZoom = Math.min(containerW / naturalW, containerH / naturalH);
+
+  return {
+    zoom: fitZoom,
+    panX: 0,
+    panY: 0,
   };
+}
+
+
+  // ── Zoom / Pan ──────────────────────────────────────────────────
+const zoomToward = (clientX: number, clientY: number, newZoom: number) => {
+  const container = mapContainerRef.current;
+  if (!container) return;
+
+  // Convert cursor to container coordinates
+  const rect = container.getBoundingClientRect();
+  const offsetX = clientX - rect.left;
+  const offsetY = clientY - rect.top;
+
+  // Convert screen point to image space
+  const imageX = (offsetX - pan.x) / zoom;
+  const imageY = (offsetY - pan.y) / zoom;
+
+  // Compute new pan so that the same image point stays under cursor
+  const newPanX = offsetX - imageX * newZoom;
+  const newPanY = offsetY - imageY * newZoom;
+
+  setZoom(newZoom);
+  setPan({ x: newPanX, y: newPanY });
+};
+
+
+const zoomToDesk = (deskId: number) => {
+  const position = deskPositions.get(deskId);
+  if (!position) return;
+
+  const image = mapImageRef.current;
+  const container = mapContainerRef.current;
+  if (!image || !container) return;
+
+  const imageW = image.naturalWidth;
+  const imageH = image.naturalHeight;
+
+  const containerW = container.clientWidth;
+  const containerH = container.clientHeight;
+
+  // 1️⃣ Define how much you want to zoom in
+  const targetZoom = Math.min(baseZoom * 2, 4); // 2x zoom, capped
+
+  // 2️⃣ Desk position in image space
+  const deskImageX = position.x * imageW;
+  const deskImageY = position.y * imageH;
+
+  // 3️⃣ Solve for new pan (image space)
+  const newPanX = (containerW / (2 * targetZoom)) - deskImageX;
+  const newPanY = (containerH / (2 * targetZoom)) - deskImageY;
+
+  setZoom(targetZoom);
+  setPan({
+    x: newPanX,
+    y: newPanY,
+  });
+};
+
+
+
+  const handleZoomIn  = () => zoomToward(
+    (mapContainerRef.current?.getBoundingClientRect().left ?? 0) + (mapContainerRef.current?.offsetWidth  ?? 0) / 2,
+    (mapContainerRef.current?.getBoundingClientRect().top  ?? 0) + (mapContainerRef.current?.offsetHeight ?? 0) / 2,
+    Math.min(zoom + 0.25, 3)
+  );
+  const handleZoomOut = () => zoomToward(
+    (mapContainerRef.current?.getBoundingClientRect().left ?? 0) + (mapContainerRef.current?.offsetWidth  ?? 0) / 2,
+    (mapContainerRef.current?.getBoundingClientRect().top  ?? 0) + (mapContainerRef.current?.offsetHeight ?? 0) / 2,
+    Math.max(zoom - 0.25, 0.5)
+  );
+const handleResetView = () => {
+  const image = mapImageRef.current;
+  const container = mapContainerRef.current;
+  if (!image || !container || !image.naturalWidth) return;
+
+  const { zoom, panX, panY } = computeTopLeftFit(
+    container.clientWidth,
+    container.clientHeight,
+    image.naturalWidth,
+    image.naturalHeight
+  );
+
+  setZoom(zoom);
+  setPan({ x: panX, y: panY });
+};
+
+
+const handleWheel = (e: React.WheelEvent) => {
+  e.preventDefault();
+
+  // Determine zoom delta
+  const delta = e.deltaY > 0 ? -0.15 : 0.15;
+  const newZoom = Math.max(baseZoom * 0.8, Math.min(3, zoom + delta));
+
+  // Zoom toward the cursor
+  zoomToward(e.clientX, e.clientY, newZoom);
+};
+
+
 
   const handleMapMouseDown = (e: React.MouseEvent) => {
-    if (draggingDeskId !== null) return; // Don't pan while dragging desk
-    
+    if (draggingDeskId !== null) return;
     setIsPanning(true);
     setPanStart({ x: e.clientX - pan.x, y: e.clientY - pan.y });
   };
 
   const handleMapMouseMove = (e: React.MouseEvent) => {
     if (isPanning && draggingDeskId === null) {
-      setPan({
-        x: e.clientX - panStart.x,
-        y: e.clientY - panStart.y,
-      });
+      setPan({ x: e.clientX - panStart.x, y: e.clientY - panStart.y });
       return;
     }
-
-    if (draggingDeskId !== null) {
-      handleDeskDrag(e);
-    }
+    if (draggingDeskId !== null) handleDeskDrag(e);
   };
 
   const handleMapMouseUp = () => {
@@ -318,88 +514,60 @@ export const ManageDesksModal: React.FC<ManageDesksModalProps> = ({
     setDraggingDeskId(null);
   };
 
+  // ── Desk dragging ───────────────────────────────────────────────
+  // imageWrapperRef is the inline-block div that exactly matches the rendered image size.
+  // All marker left/top percentages are relative to it, so drag coords must be too.
   const handleDeskMouseDown = (e: React.MouseEvent, deskId: number) => {
     e.stopPropagation();
     e.preventDefault();
-    
-    const wrapper = mapWrapperRef.current;
-    if (!wrapper) return;
 
-    const position = deskPositions.get(deskId);
-    if (!position) return;
+    const imgWrapper = imageWrapperRef.current;
+    if (!imgWrapper) return;
 
-    const wrapperRect = wrapper.getBoundingClientRect();
-    
-    // Calculate desk position in transformed space
-    const deskX = position.x * wrapperRect.width;
-    const deskY = position.y * wrapperRect.height;
-    
+    const pos = deskPositions.get(deskId);
+    if (!pos) return;
+
+    const rect = imgWrapper.getBoundingClientRect();
     dragOffsetRef.current = {
-      x: (e.clientX - wrapperRect.left) - deskX,
-      y: (e.clientY - wrapperRect.top) - deskY,
+      x: e.clientX - (rect.left + pos.x * rect.width),
+      y: e.clientY - (rect.top  + pos.y * rect.height),
     };
-
     setDraggingDeskId(deskId);
   };
 
   const handleDeskDrag = (e: React.MouseEvent) => {
     if (draggingDeskId === null) return;
+    const imgWrapper = imageWrapperRef.current;
+    if (!imgWrapper) return;
 
-    const wrapper = mapWrapperRef.current;
-    if (!wrapper) return;
+    const rect = imgWrapper.getBoundingClientRect();
+    const margin = 0.03;
+    const x = Math.max(margin, Math.min(1 - margin, (e.clientX - rect.left - dragOffsetRef.current.x) / rect.width));
+    const y = Math.max(margin, Math.min(1 - margin, (e.clientY - rect.top  - dragOffsetRef.current.y) / rect.height));
 
-    const wrapperRect = wrapper.getBoundingClientRect();
-    
-    // Calculate new position as percentage
-    let x = ((e.clientX - wrapperRect.left) - dragOffsetRef.current.x) / wrapperRect.width;
-    let y = ((e.clientY - wrapperRect.top) - dragOffsetRef.current.y) / wrapperRect.height;
-
-    // Clamp to 0-1 range
-    x = Math.max(0, Math.min(1, x));
-    y = Math.max(0, Math.min(1, y));
-
-    const newPositions = new Map(deskPositions);
-    newPositions.set(draggingDeskId, {
-      id: draggingDeskId,
-      x,
-      y,
-      saved: false,
+    setDeskPositions(prev => {
+      const next = new Map(prev);
+      next.set(draggingDeskId, { id: draggingDeskId, x, y, saved: false });
+      return next;
     });
-    setDeskPositions(newPositions);
   };
 
+  // ── CRUD ────────────────────────────────────────────────────────
   const handleAddDesk = async () => {
     if (!room || !newDeskName.trim()) return;
-
     try {
       setAddingDesk(true);
-      const response = await authenticatedFetch(`${API_BASE_URL}/desks/`, {
+      const res = await authenticatedFetch(`${API_BASE_URL}/desks/`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: newDeskName.trim(),
-          room: room.id,
-          pos_x: 0.5,
-          pos_y: 0.5,
-        }),
+        body: JSON.stringify({ name: newDeskName.trim(), room: room.id, pos_x: 0.5, pos_y: 0.5 }),
       });
-
-      if (!response.ok) {
-        const error = await response.json().catch(() => ({}));
-        throw new Error(error.detail || 'Failed to create desk');
-      }
-
-      const newDesk = await response.json();
-      setDesks([...desks, newDesk]);
-      setDeskPositions(new Map(deskPositions).set(newDesk.id, {
-        id: newDesk.id,
-        x: 0.5,
-        y: 0.5,
-        saved: false,
-      }));
+      if (!res.ok) throw new Error((await res.json().catch(() => ({}))).detail || 'Failed to create desk');
+      const newDesk = await res.json();
+      setDesks(prev => [...prev, newDesk]);
+      setDeskPositions(prev => new Map(prev).set(newDesk.id, { id: newDesk.id, x: 0.5, y: 0.5, saved: false }));
       setNewDeskName('');
     } catch (err: any) {
-      console.error('Failed to add desk:', err);
       alert(err.message || 'Failed to add desk');
     } finally {
       setAddingDesk(false);
@@ -407,27 +575,14 @@ export const ManageDesksModal: React.FC<ManageDesksModalProps> = ({
   };
 
   const handleDeleteDesk = async (deskId: number) => {
-    if (!confirm('Are you sure you want to delete this desk?')) {
-      return;
-    }
-
+    if (!confirm('Are you sure you want to delete this desk?')) return;
     try {
       setLoading(true);
-      const response = await authenticatedFetch(`${API_BASE_URL}/desks/${deskId}/`, {
-        method: 'DELETE',
-      });
-
-      if (!response.ok) {
-        const error = await response.json().catch(() => ({}));
-        throw new Error(error.detail || 'Failed to delete desk');
-      }
-
-      setDesks(desks.filter(d => d.id !== deskId));
-      const newPositions = new Map(deskPositions);
-      newPositions.delete(deskId);
-      setDeskPositions(newPositions);
+      const res = await authenticatedFetch(`${API_BASE_URL}/desks/${deskId}/`, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Failed to delete desk');
+      setDesks(prev => prev.filter(d => d.id !== deskId));
+      setDeskPositions(prev => { const m = new Map(prev); m.delete(deskId); return m; });
     } catch (err: any) {
-      console.error('Failed to delete desk:', err);
       alert(err.message || 'Failed to delete desk');
     } finally {
       setLoading(false);
@@ -435,306 +590,371 @@ export const ManageDesksModal: React.FC<ManageDesksModalProps> = ({
   };
 
   const handleSaveDeskPosition = async (deskId: number) => {
-    const position = deskPositions.get(deskId);
-    if (!position) return;
-
+    const pos = deskPositions.get(deskId);
+    if (!pos) return;
     try {
       setSavingDeskId(deskId);
-      const response = await authenticatedFetch(`${API_BASE_URL}/desks/${deskId}/`, {
+      const res = await authenticatedFetch(`${API_BASE_URL}/desks/${deskId}/`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          pos_x: position.x,
-          pos_y: position.y,
-        }),
+        body: JSON.stringify({ pos_x: pos.x, pos_y: pos.y }),
       });
-
-      if (!response.ok) {
-        throw new Error('Failed to save desk position');
-      }
-
-      const newPositions = new Map(deskPositions);
-      newPositions.set(deskId, { ...position, saved: true });
-      setDeskPositions(newPositions);
-      
-      const updatedDesk = await response.json();
-      setDesks(desks.map(d => d.id === deskId ? updatedDesk : d));
+      if (!res.ok) throw new Error('Failed to save position');
+      const updated = await res.json();
+      setDeskPositions(prev => new Map(prev).set(deskId, { ...pos, saved: true }));
+      setDesks(prev => prev.map(d => d.id === deskId ? updated : d));
     } catch (err: any) {
-      console.error('Failed to save position:', err);
       alert(err.message || 'Failed to save desk position');
     } finally {
       setSavingDeskId(null);
     }
   };
 
-  const totalDesks = desks.length;
-  const bookedDesks = desks.filter(d => d.is_booked).length;
+  const handleAssignPermanent = async (deskId: number, userId: number) => {
+    const res = await authenticatedFetch(`${API_BASE_URL}/desks/${deskId}/assign-permanent/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_id: userId }),
+    });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || err.detail || 'Failed to assign');
+    }
+    const updated = await res.json();
+    setDesks(prev => prev.map(d => d.id === deskId ? updated : d));
+    // Sync the desk in assignPermanentDesk if still open
+    setAssignPermanentDesk(prev => prev?.id === deskId ? updated : prev);
+  };
+
+  const handleClearPermanent = async (deskId: number) => {
+    const res = await authenticatedFetch(`${API_BASE_URL}/desks/${deskId}/clear-permanent/`, { method: 'POST' });
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err.error || err.detail || 'Failed to clear');
+    }
+    const updated = await res.json();
+    setDesks(prev => prev.map(d => d.id === deskId ? updated : d));
+  };
+
+  // ── Derived stats ───────────────────────────────────────────────
+  const totalDesks     = desks.length;
+  const bookedDesks    = desks.filter(d => d.is_booked).length;
   const permanentDesks = desks.filter(d => d.is_permanent).length;
   const availableDesks = totalDesks - bookedDesks - permanentDesks;
 
-  const getDeskMarkerStyle = (desk: Desk): React.CSSProperties => {
-    const position = deskPositions.get(desk.id);
-    if (!position) return {};
-    
-    return {
-      left: `${position.x * 100}%`,
-      top: `${position.y * 100}%`,
-      transform: 'translate(-50%, -50%)',
-    };
+  const markerBgColor = (desk: Desk, isEditing: boolean): string => {
+    if (isEditing || selectedDeskId === desk.id) return '#f59e0b';
+    if (deskPositions.get(desk.id)?.saved === false) return '#f59e0b';
+    if (desk.is_booked)    return '#ef4444';
+    if (desk.is_permanent) return '#a855f7';
+    return '#0078d4';
   };
 
-  return (
-    <Dialog open={open} onOpenChange={(_, data) => !data.open && onClose()}>
-      <DialogSurface style={{ maxWidth: '1200px', maxHeight: '90vh' }}>
-        <DialogBody>
-          <DialogTitle>
-            Manage Desks - {room?.name}
-          </DialogTitle>
-          <DialogContent>
-            {/* Stats Row */}
-            <div className={styles.statsRow}>
-              <div className={styles.stat}>
-                <div className={styles.statValue}>{totalDesks}</div>
-                <div className={styles.statLabel}>Total</div>
-              </div>
-              <div className={styles.stat}>
-                <div className={styles.statValue}>{availableDesks}</div>
-                <div className={styles.statLabel}>Available</div>
-              </div>
-              <div className={styles.stat}>
-                <div className={styles.statValue}>{bookedDesks}</div>
-                <div className={styles.statLabel}>Booked</div>
-              </div>
-              <div className={styles.stat}>
-                <div className={styles.statValue}>{permanentDesks}</div>
-                <div className={styles.statLabel}>Permanent</div>
-              </div>
-            </div>
+  // Click a desk in the list → toggle selection and pan to center it
+const handleListDeskClick = (desk: Desk) => {
+  const newSelectedId = selectedDeskId === desk.id ? null : desk.id;
+  setSelectedDeskId(newSelectedId);
 
-            {/* Main Content */}
-            <div className={styles.modalContent}>
-              {/* Left Panel */}
-              <div className={styles.leftPanel}>
-                <div className={styles.desksHeader}>
-                  <Text size={400} weight="semibold">Desks ({desks.length})</Text>
-                </div>
-                
-                <div className={styles.desksList}>
-                  {loading ? (
-                    <div style={{ display: 'flex', justifyContent: 'center', padding: tokens.spacingVerticalXL }}>
-                      <Spinner size="small" />
-                    </div>
-                  ) : desks.length === 0 ? (
-                    <Text size={200} style={{ color: tokens.colorNeutralForeground3, textAlign: 'center', padding: tokens.spacingVerticalL }}>
-                      No desks yet. Add your first desk below.
-                    </Text>
-                  ) : (
-                    desks.map((desk) => {
-                      const position = deskPositions.get(desk.id);
-                      const isUnsaved = position && !position.saved;
-                      
+  if (newSelectedId === null) {
+    handleResetView();
+    return;
+  }
+
+  const pos = deskPositions.get(desk.id);
+  const container = mapContainerRef.current;
+  const imgWrapper = imageWrapperRef.current;
+
+  if (!pos || !container || !imgWrapper) return;
+
+  const containerRect = container.getBoundingClientRect();
+  const imageRect = imgWrapper.getBoundingClientRect();
+
+  // Desk position in *screen space*
+  const deskScreenX = imageRect.left + pos.x * imageRect.width;
+  const deskScreenY = imageRect.top + pos.y * imageRect.height;
+
+  const containerCenterX = containerRect.left + containerRect.width / 2;
+  const containerCenterY = containerRect.top + containerRect.height / 2;
+
+  const deltaX = containerCenterX - deskScreenX;
+  const deltaY = containerCenterY - deskScreenY;
+
+  setPan(prev => ({
+    x: prev.x + deltaX,
+    y: prev.y + deltaY,
+  }));
+
+  setTimeout(() => {
+    markerRefs.current.get(desk.id)?.click();
+  }, 100);
+};
+
+
+  return (
+    <>
+      <Dialog open={open} onOpenChange={(_, d) => !d.open && onClose()}>
+        <DialogSurface style={{ maxWidth: '1200px', maxHeight: '90vh' }}>
+          <DialogBody>
+            <DialogTitle>Manage Desks — {room?.name}</DialogTitle>
+            <DialogContent>
+
+              {/* Stats */}
+              <div className={styles.statsRow}>
+                {[
+                  { label: 'Total',     value: totalDesks },
+                  { label: 'Available', value: availableDesks },
+                  { label: 'Booked',    value: bookedDesks },
+                  { label: 'Permanent', value: permanentDesks },
+                ].map(s => (
+                  <div key={s.label} className={styles.stat}>
+                    <div className={styles.statValue}>{s.value}</div>
+                    <div className={styles.statLabel}>{s.label}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Main layout */}
+              <div className={styles.modalContent}>
+
+                {/* ── Left: desk list ── */}
+                <div className={styles.leftPanel}>
+                  <div className={styles.desksHeader}>
+                    <Text size={400} weight="semibold">Desks ({desks.length})</Text>
+                  </div>
+
+                  <div className={styles.desksList}>
+                    {loading ? (
+                      <div style={{ display: 'flex', justifyContent: 'center', padding: tokens.spacingVerticalXL }}>
+                        <Spinner size="small" />
+                      </div>
+                    ) : desks.length === 0 ? (
+                      <Text size={200} style={{ color: tokens.colorNeutralForeground3, textAlign: 'center', padding: tokens.spacingVerticalL }}>
+                        No desks yet.
+                      </Text>
+                    ) : desks.map(desk => {
+                      const pos = deskPositions.get(desk.id);
+                      const isUnsaved = pos && !pos.saved;
+                      const isSelected = selectedDeskId === desk.id;
                       return (
-                        <div key={desk.id} className={styles.deskItem}>
+                        <div
+                          key={desk.id}
+                          className={`${styles.deskItem} ${isSelected ? styles.deskItemSelected : ''}`}
+                          onClick={() => handleListDeskClick(desk)}
+                          style={{ cursor: 'pointer' }}
+                        >
                           <div className={styles.deskInfo}>
-                            <Text className={styles.deskName}>{desk.name}</Text>
-                            <div className={styles.badgeContainer}>
-                              {isUnsaved && <Badge appearance="filled" color="warning" size="small">Unsaved</Badge>}
-                              {desk.is_booked && <Badge appearance="filled" color="danger" size="small">Booked</Badge>}
-                              {desk.is_permanent && <Badge appearance="filled" color="brand" size="small">Permanent</Badge>}
+                            <div className={styles.deskNameRow}>
+                              <Text className={styles.deskName}>{desk.name}</Text>
+                              {isUnsaved         && <Badge appearance="filled" color="warning" size="small">Unsaved</Badge>}
+                              {desk.is_booked    && <Badge appearance="filled" color="danger"  size="small">Booked</Badge>}
+                              {desk.is_permanent && <Badge appearance="filled" color="brand"   size="small">Permanent</Badge>}
                             </div>
+                            {desk.is_permanent && desk.permanent_assignee_full_name && (
+                              <Text className={styles.deskAssignee}>{desk.permanent_assignee_full_name}</Text>
+                            )}
                           </div>
-                          <Button
-                            appearance="subtle"
-                            icon={<Delete20Regular />}
-                            size="small"
-                            onClick={() => handleDeleteDesk(desk.id)}
-                            aria-label="Delete desk"
-                          />
+                          <div className={styles.deskActions} onClick={e => e.stopPropagation()}>
+                            <Button
+                              appearance="subtle"
+                              icon={<PersonTag20Regular />}
+                              size="small"
+                              onClick={() => setAssignPermanentDesk(desk)}
+                              title={desk.is_permanent ? 'Manage permanent assignment' : 'Assign permanent user'}
+                            />
+                            <Button
+                              appearance="subtle"
+                              icon={<Delete20Regular />}
+                              size="small"
+                              onClick={() => handleDeleteDesk(desk.id)}
+                              title="Delete desk"
+                            />
+                          </div>
                         </div>
                       );
-                    })
+                    })}
+                  </div>
+
+                  <div className={styles.addDeskSection}>
+                    <Field>
+                      <Input
+                        size="small"
+                        value={newDeskName}
+                        onChange={(_, d) => setNewDeskName(d.value)}
+                        placeholder="Desk name (e.g., Desk 1)"
+                        onKeyPress={e => { if (e.key === 'Enter') handleAddDesk(); }}
+                      />
+                    </Field>
+                    <Button
+                      appearance="primary"
+                      icon={<Add20Regular />}
+                      onClick={handleAddDesk}
+                      disabled={!newDeskName.trim() || addingDesk}
+                      size="small"
+                      style={{ width: '100%' }}
+                    >
+                      {addingDesk ? 'Adding...' : 'Add Desk'}
+                    </Button>
+                  </div>
+                </div>
+
+                {/* ── Right: map ── */}
+                <div className={styles.rightPanel}>
+                  <div className={styles.mapControls}>
+                    <Button appearance="subtle" icon={<SubtractSquare20Regular />} size="small" onClick={handleZoomOut} disabled={zoom <= 0.5} title="Zoom out" />
+                    <Text size={200}>{Math.round(zoom * 100)}%</Text>
+                    <Button appearance="subtle" icon={<AddSquare20Regular />} size="small" onClick={handleZoomIn} disabled={zoom >= 3} title="Zoom in" />
+                    <Button appearance="subtle" icon={<ArrowCounterclockwise20Regular />} size="small" onClick={handleResetView} title="Reset view" />
+                  </div>
+
+                  {room?.map_image ? (
+                    <div
+                      ref={mapContainerRef}
+                      className={`${styles.mapContainer} ${isPanning ? styles.mapContainerPanning : ''}`}
+                      onMouseDown={handleMapMouseDown}
+                      onMouseMove={handleMapMouseMove}
+                      onMouseUp={handleMapMouseUp}
+                      onMouseLeave={handleMapMouseUp}
+                      onWheel={handleWheel}
+                    >
+                      {/* Zoom/pan transform wrapper */}
+                      <div
+                        ref={mapWrapperRef}
+                        className={styles.mapWrapper}
+                        style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})` }}
+                      >
+                        {/* markerLayer centres imageWrapper inside the full-size wrapper */}
+                        <div className={styles.markerLayer}>
+                          {/* imageWrapper is inline-block — its dimensions exactly match
+                              the rendered image. Marker left/top % are relative to this. */}
+                          <div ref={imageWrapperRef} className={styles.imageWrapper}>
+                            <img
+                              ref={mapImageRef}
+                              src={room.map_image}
+                              alt="Room map"
+                              className={styles.mapImage}
+                              draggable={false}
+                            />
+
+                            {desks.map(desk => {
+                              const pos       = deskPositions.get(desk.id);
+                              const isDragging = draggingDeskId === desk.id;
+                              const isEditing  = editingPositionDeskId === desk.id;
+                              const isUnsaved  = pos && !pos.saved;
+                              const isSelected = selectedDeskId === desk.id;
+                              if (!pos) return null;
+
+                              return (
+                                <div
+                                  key={desk.id}
+                                  style={{
+                                    position: 'absolute',
+                                    left: `${pos.x * 100}%`,
+                                    top:  `${pos.y * 100}%`,
+                                    transform: 'translate(-50%, -50%)',
+                                    zIndex: isDragging ? 999 : isSelected ? 20 : 10,
+                                    cursor: isEditing ? 'move' : 'pointer',
+                                    pointerEvents: 'all',
+                                  }}
+                                  onMouseDown={e => {
+                                    e.stopPropagation();
+                                    if (isEditing) handleDeskMouseDown(e, desk.id);
+                                  }}
+                                >
+                                  <Menu onOpenChange={(_, d) => { if (d.open) setSelectedDeskId(desk.id); }}>
+                                    <MenuTrigger disableButtonEnhancement>
+                                      <div
+                                        ref={el => {
+                                          if (el) markerRefs.current.set(desk.id, el);
+                                          else markerRefs.current.delete(desk.id);
+                                        }}
+                                        className={`${styles.deskMarker} ${isDragging ? styles.deskMarkerDragging : ''}`}
+                                        title={desk.name}
+                                        style={{
+                                          backgroundColor: markerBgColor(desk, isEditing),
+                                          color: '#ffffff',
+                                          cursor: 'inherit',
+                                          // Pulse ring on selected
+                                          outline: isSelected && !isEditing ? '3px solid #f59e0b' : 'none',
+                                          outlineOffset: '2px',
+                                        }}
+                                      >
+                                        <Person24Filled />
+                                      </div>
+                                    </MenuTrigger>
+                                    <MenuPopover>
+                                      <MenuList>
+                                        {isEditing || isUnsaved ? (
+                                          <MenuItem
+                                            icon={<Checkmark20Regular />}
+                                            disabled={savingDeskId === desk.id}
+                                            onClick={() => {
+                                              handleSaveDeskPosition(desk.id);
+                                              setEditingPositionDeskId(null);
+                                            }}
+                                          >
+                                            {savingDeskId === desk.id ? 'Saving...' : 'Save Position'}
+                                          </MenuItem>
+                                        ) : (
+                                          <MenuItem
+                                            icon={<LocationRegular />}
+                                            onClick={() => {
+                                                setEditingPositionDeskId(desk.id)
+                                                zoomToDesk(desk.id);
+                                            }}
+                                          >
+                                            Change Position
+                                          </MenuItem>
+                                        )}
+                                        <MenuItem
+                                          icon={<PersonTag20Regular />}
+                                          onClick={() => setAssignPermanentDesk(desk)}
+                                        >
+                                          {desk.is_permanent ? 'Manage Assignment' : 'Assign Permanent User'}
+                                        </MenuItem>
+                                        <MenuItem
+                                          icon={<Delete20Regular />}
+                                          onClick={() => handleDeleteDesk(desk.id)}
+                                        >
+                                          Delete Desk
+                                        </MenuItem>
+                                      </MenuList>
+                                    </MenuPopover>
+                                  </Menu>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className={styles.mapContainer}>
+                      <div className={styles.emptyMap}>
+                        <Text size={300}>No room map uploaded yet</Text>
+                        <Text size={200}>Upload a map to position desks</Text>
+                      </div>
+                    </div>
                   )}
                 </div>
 
-                <div className={styles.addDeskSection}>
-                  <Field>
-                    <Input
-                      value={newDeskName}
-                      onChange={(_, data) => setNewDeskName(data.value)}
-                      placeholder="Desk name (e.g., Desk 1)"
-                      onKeyPress={(e) => {
-                        if (e.key === 'Enter') handleAddDesk();
-                      }}
-                      size="small"
-                    />
-                  </Field>
-                  <Button
-                    appearance="primary"
-                    icon={<Add20Regular />}
-                    onClick={handleAddDesk}
-                    disabled={!newDeskName.trim() || addingDesk}
-                    size="small"
-                    style={{ width: '100%' }}
-                  >
-                    {addingDesk ? 'Adding...' : 'Add Desk'}
-                  </Button>
-                </div>
               </div>
+            </DialogContent>
 
-              {/* Right Panel */}
-              <div className={styles.rightPanel}>
-                <div className={styles.mapControls}>
-                  <Button
-                    appearance="subtle"
-                    icon={<ZoomOut20Regular />}
-                    size="small"
-                    onClick={handleZoomOut}
-                    disabled={zoom <= 0.5}
-                  />
-                  <Text size={200}>{Math.round(zoom * 100)}%</Text>
-                  <Button
-                    appearance="subtle"
-                    icon={<ZoomIn20Regular />}
-                    size="small"
-                    onClick={handleZoomIn}
-                    disabled={zoom >= 3}
-                  />
-                  <Button
-                    appearance="subtle"
-                    icon={<ArrowReset20Regular />}
-                    size="small"
-                    onClick={handleResetView}
-                  />
-                </div>
+            <DialogActions>
+              <Button appearance="primary" onClick={onClose}>Done</Button>
+            </DialogActions>
+          </DialogBody>
+        </DialogSurface>
+      </Dialog>
 
-                {room?.map_image ? (
-                  <div
-                    ref={mapContainerRef}
-                    className={`${styles.mapContainer} ${isPanning ? styles.mapContainerPanning : ''}`}
-                    onMouseDown={handleMapMouseDown}
-                    onMouseMove={handleMapMouseMove}
-                    onMouseUp={handleMapMouseUp}
-                    onMouseLeave={handleMapMouseUp}
-                    onWheel={handleWheel}
-                  >
-                    <div
-                      ref={mapWrapperRef}
-                      className={styles.mapWrapper}
-                      style={{
-                        transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
-                      }}
-                    >
-                      <img
-                        src={room.map_image}
-                        alt="Room map"
-                        className={styles.mapImage}
-                        draggable={false}
-                      />
-                      
-                      {/* Desk Markers */}
-                      {desks.map((desk) => {
-                        const position = deskPositions.get(desk.id);
-                        const isDragging = draggingDeskId === desk.id;
-                        const isUnsaved = position && !position.saved;
-                        
-                        let bgColor = '#0078d4';
-                        let iconColor = '#ffffff';
-                        
-                        if (isUnsaved) {
-                          bgColor = '#f59e0b';
-                        } else if (desk.is_booked) {
-                          bgColor = '#ef4444';
-                        } else if (desk.is_permanent) {
-                          bgColor = '#a855f7';
-                        }
-                        
-                        const markerClass = `
-                          ${styles.deskMarker} 
-                          ${isDragging ? styles.deskMarkerDragging : ''} 
-                        `;
-                        
-                        return (
-                          <div
-                            key={desk.id}
-                            style={{ position: 'absolute', ...getDeskMarkerStyle(desk) }}
-                          >
-                            <Menu>
-                              <MenuTrigger disableButtonEnhancement>
-                                <div
-                                  className={markerClass}
-                                  onMouseDown={(e) => {
-                                    // Only allow dragging if in edit mode for this desk
-                                    if (editingPositionDeskId === desk.id) {
-                                      handleDeskMouseDown(e, desk.id);
-                                    }
-                                  }}
-                                  title={desk.name}
-                                  style={{ 
-                                    backgroundColor: editingPositionDeskId === desk.id ? '#f59e0b' : bgColor,
-                                    color: iconColor,
-                                    cursor: editingPositionDeskId === desk.id ? 'move' : 'pointer',
-                                  }}
-                                >
-                                  <Person24Filled />
-                                </div>
-                              </MenuTrigger>
-                              <MenuPopover>
-                                <MenuList>
-                                  {isUnsaved || editingPositionDeskId === desk.id ? (
-                                    <MenuItem
-                                      icon={<Checkmark20Regular />}
-                                      onClick={() => {
-                                        handleSaveDeskPosition(desk.id);
-                                        setEditingPositionDeskId(null);
-                                      }}
-                                      disabled={savingDeskId === desk.id}
-                                    >
-                                      {savingDeskId === desk.id ? 'Saving...' : 'Save Position'}
-                                    </MenuItem>
-                                  ) : (
-                                    <MenuItem
-                                      icon={<LocationRegular />}
-                                      onClick={() => {
-                                        setEditingPositionDeskId(desk.id);
-                                      }}
-                                    >
-                                      Change Position
-                                    </MenuItem>
-                                  )}
-                                  <MenuItem
-                                    icon={<Delete20Regular />}
-                                    onClick={() => handleDeleteDesk(desk.id)}
-                                  >
-                                    Delete Desk
-                                  </MenuItem>
-                                </MenuList>
-                              </MenuPopover>
-                            </Menu>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                ) : (
-                  <div className={styles.mapContainer}>
-                    <div className={styles.emptyMap}>
-                      <Text size={300}>No room map uploaded yet</Text>
-                      <Text size={200} style={{ marginTop: tokens.spacingVerticalS }}>
-                        Upload a map to position desks
-                      </Text>
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          </DialogContent>
-          <DialogActions>
-            <Button appearance="primary" onClick={onClose}>
-              Done
-            </Button>
-          </DialogActions>
-        </DialogBody>
-      </DialogSurface>
-    </Dialog>
+      {/* Permanent assignment sub-modal */}
+      <AssignPermanentModal
+        open={!!assignPermanentDesk}
+        onClose={() => setAssignPermanentDesk(null)}
+        desk={assignPermanentDesk}
+        onAssign={handleAssignPermanent}
+        onClear={handleClearPermanent}
+      />
+    </>
   );
 };

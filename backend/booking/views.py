@@ -129,6 +129,78 @@ class DeskViewSet(viewsets.ModelViewSet):
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['room']
 
+    def _is_desk_manager(self, request, desk):
+        """Check if user can manage this desk (room manager, location manager, or superuser)"""
+        user = request.user
+        if user.is_superuser or user.is_staff:
+            return True
+        if desk.room.is_room_manager(user):
+            return True
+        if desk.room.floor.location.is_location_manager(user):
+            return True
+        return False
+
+    @action(detail=True, methods=['post'], url_path='assign-permanent')
+    def assign_permanent(self, request, pk=None):
+        """
+        Permanently assign a desk to a user.
+        Endpoint: POST /api/desks/{id}/assign-permanent/
+        Body: {"user_id": 5}
+        """
+        desk = self.get_object()
+
+        if not self._is_desk_manager(request, desk):
+            return Response(
+                {'error': 'You do not have permission to assign permanent desks'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        user_id = request.data.get('user_id')
+        if not user_id:
+            return Response(
+                {'error': 'user_id is required'},
+                status=status.HTTP_400_BAD_REQUEST
+            )
+
+        try:
+            from django.contrib.auth import get_user_model
+            User = get_user_model()
+            assignee = User.objects.get(id=user_id)
+        except User.DoesNotExist:
+            return Response(
+                {'error': 'User not found'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+
+        desk.is_permanent = True
+        desk.permanent_assignee = assignee
+        desk.full_clean()
+        desk.save()
+
+        serializer = self.get_serializer(desk)
+        return Response(serializer.data)
+
+    @action(detail=True, methods=['post'], url_path='clear-permanent')
+    def clear_permanent(self, request, pk=None):
+        """
+        Remove permanent assignment from a desk.
+        Endpoint: POST /api/desks/{id}/clear-permanent/
+        """
+        desk = self.get_object()
+
+        if not self._is_desk_manager(request, desk):
+            return Response(
+                {'error': 'You do not have permission to modify permanent desks'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        desk.is_permanent = False
+        desk.permanent_assignee = None
+        desk.save()
+
+        serializer = self.get_serializer(desk)
+        return Response(serializer.data)
+
     @action(detail=True, methods=['get'])
     def lock_state(self, request, pk=None):
         data = read_lock(int(pk)) # type: ignore

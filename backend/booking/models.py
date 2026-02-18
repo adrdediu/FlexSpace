@@ -102,6 +102,12 @@ class Room(models.Model):
         help_text='User groups that can book desks in this room'
     )
 
+    # Maintenance flag — set automatically when a manager opens the desk editor
+    is_under_maintenance = models.BooleanField(
+        default=False,
+        help_text='Room is temporarily unavailable for booking while being edited by a manager'
+    )
+
     class Meta:
         unique_together = ('name', 'floor')
 

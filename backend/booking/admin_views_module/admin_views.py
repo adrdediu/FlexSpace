@@ -402,3 +402,37 @@ class RoomManagementViewSet(viewsets.ModelViewSet):
         
         serializer = RoomSerializer(room, context={'request': request})
         return Response(serializer.data)
+
+    @action(detail=True, methods=['post'], url_path='set-maintenance')
+    def set_maintenance(self, request, pk=None):
+        """
+        Mark room as under maintenance (unavailable for booking).
+        Called automatically when a manager opens the desk editor.
+        Endpoint: POST /api/admin/rooms/{id}/set-maintenance/
+        """
+        room = self.get_object()
+        if not room.is_room_manager(request.user) and not request.user.is_superuser:
+            return Response(
+                {'error': 'Only room managers can set maintenance mode'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        room.is_under_maintenance = True
+        room.save(update_fields=['is_under_maintenance'])
+        return Response({'is_under_maintenance': True})
+
+    @action(detail=True, methods=['post'], url_path='clear-maintenance')
+    def clear_maintenance(self, request, pk=None):
+        """
+        Mark room as available again.
+        Called automatically when a manager closes the desk editor.
+        Endpoint: POST /api/admin/rooms/{id}/clear-maintenance/
+        """
+        room = self.get_object()
+        if not room.is_room_manager(request.user) and not request.user.is_superuser:
+            return Response(
+                {'error': 'Only room managers can clear maintenance mode'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+        room.is_under_maintenance = False
+        room.save(update_fields=['is_under_maintenance'])
+        return Response({'is_under_maintenance': False})

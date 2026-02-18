@@ -10,3 +10,4 @@ export { ManageRoomManagersModal } from './ManageRoomManagersModal';
 export { ManageAllowedGroupsModal } from './ManageAllowedGroupsModal';
 export { UploadRoomMapModal } from './UploadRoomMapModal';
 export { ManageDesksModal } from './ManageDesksModal';
+export { AssignPermanentModal } from './AssignPermanentModal';
