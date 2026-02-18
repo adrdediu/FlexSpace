@@ -1,6 +1,6 @@
 import React, {useCallback, useEffect, useState, useRef} from 'react';
 import { useNavigate } from 'react-router-dom';
-import { makeStyles, Button, Text } from '@fluentui/react-components';
+import { makeStyles, Button, Text, Spinner } from '@fluentui/react-components';
 import { useAuth } from '../contexts/AuthContext';
 import websocketService from '../services/websocketService';
 import { TopBar } from './TopBar';
@@ -10,6 +10,10 @@ import { SettingsDialog, ProfileDialog } from './Common';
 import { AdminDashboard } from './Admin';
 import { type WsStatus, type NavSection } from '../types/common';
 import { type Desk, type Room } from './Dashboard/types';
+import { RoomMapViewer } from './Dashboard/RoomMapViewer';
+import { LocationBrowser } from './Dashboard/LocationBrowser';
+import { TodayPanel } from './Dashboard/TodayPanel';
+import { type RoomWithDesks } from '../services/roomApi';
 
 const useStyles = makeStyles({
   container: {
@@ -46,7 +50,7 @@ interface HomeProps {
 
 const Home: React.FC<HomeProps> = ({ onMount }) => {
   const styles = useStyles();
-  const {logout, user} = useAuth();
+  const {logout, user, authenticatedFetch} = useAuth();
   const navigate = useNavigate();
   
   const [globalWsStatus, setGlobalWsStatus] = useState<WsStatus>('connecting');
@@ -214,88 +218,104 @@ const Home: React.FC<HomeProps> = ({ onMount }) => {
     return () => clearInterval(pingInterval);
   },[globalWsStatus]);
 
-  // Mock data for demonstration
-  const mockLocations = [
-    { id: 1, name: 'San Francisco Office', country: 'United States', rooms: 12, desks: 84, available: 45 },
-    { id: 2, name: 'London Office', country: 'United Kingdom', rooms: 8, desks: 56, available: 23 },
-    { id: 3, name: 'Tokyo Office', country: 'Japan', rooms: 6, desks: 42, available: 18 },
-  ];
+  // ── Dashboard state ──────────────────────────────────────────────────────────
+  const [selectedRoomData, setSelectedRoomData] = useState<RoomWithDesks | null>(null);
+  const [loadingRoom, setLoadingRoom] = useState(false);
+  const [bookingRefreshToken, setBookingRefreshToken] = useState(0);
 
-  const mockUpcomingBookings = [
-    { id: 1, desk: 'Desk 15', room: 'Open Space', date: 'Tomorrow, 9:00 AM - 5:00 PM', location: 'San Francisco' },
-    { id: 2, desk: 'Desk 8', room: 'Quiet Zone', date: 'Friday, 9:00 AM - 1:00 PM', location: 'San Francisco' },
-  ];
+  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
+
+  const handleRoomSelect = useCallback(async (roomId: number) => {
+    setLoadingRoom(true);
+    try {
+      // Use public desks endpoint — no admin perms needed
+      const res = await authenticatedFetch(`${API_BASE_URL}/rooms/${roomId}/desks/`);
+      if (res.ok) {
+        const data: RoomWithDesks = await res.json();
+        setSelectedRoomData(data);
+      }
+    } catch (err) {
+      console.error('Failed to load room:', err);
+    } finally {
+      setLoadingRoom(false);
+    }
+  }, [API_BASE_URL, authenticatedFetch]);
+
+  const handleBookingChange = useCallback(() => {
+    setBookingRefreshToken(t => t + 1);
+  }, []);
 
   const renderDashboard = () => (
     <FloatingPanelGrid>
-      {/* Quick Stats Panel */}
-      <FloatingPanel
-        title={`Welcome back, ${user?.first_name || user?.username || 'User'}!`}
-        position="top-left"
-        size="large"
-        opacity="glass"
-      >
-        <Section spacing="none">
-          <ContentGrid columns="2" gap="m">
-            <Card variant="subtle" noPadding>
-              <div style={{ padding: '16px', textAlign: 'center' }}>
-                <div className={styles.statValue}>3</div>
-                <div className={styles.statLabel}>Active Bookings</div>
-              </div>
-            </Card>
-            <Card variant="subtle" noPadding>
-              <div style={{ padding: '16px', textAlign: 'center' }}>
-                <div className={styles.statValue}>45</div>
-                <div className={styles.statLabel}>Available Desks</div>
-              </div>
-            </Card>
-          </ContentGrid>
-        </Section>
-      </FloatingPanel>
 
-      {/* Locations Panel */}
+      {/* Left — My Bookings */}
       <FloatingPanel
-        title="Browse Locations"
-        position="bottom-left"
-        size="xl"
-        opacity="glass"
-        actions={<Button appearance="primary">Book Desk</Button>}
-      >
-        <ContentGrid columns="auto-fit" gap="m">
-          {mockLocations.map(location => (
-            <Card
-              key={location.id}
-              title={location.name}
-              subtitle={location.country}
-              variant="outlined"
-              interactive
-              onClick={() => console.log('Navigate to location:', location.id)}
-            >
-              <div className={styles.locationCardContent}>
-                <Text size={200}>{location.rooms} rooms • {location.desks} desks</Text>
-                <Text size={300} weight="semibold" style={{ color: 'var(--colorBrandForeground1)' }}>
-                  {location.available} available
-                </Text>
-              </div>
-            </Card>
-          ))}
-        </ContentGrid>
-      </FloatingPanel>
-
-      {/* Quick Actions Panel */}
-      <FloatingPanel
-        position="top-right"
+        title={`Hi, ${user?.first_name || user?.username || 'there'}`}
+        position="center-left"
         size="small"
         opacity="glass"
+        style={{ top: '16px', bottom: '16px', height: 'calc(100% - 32px)' }}
       >
-        <Section spacing="none">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <Button appearance="primary" style={{ width: '100%' }}>Book a Desk</Button>
-            <Button appearance="subtle" style={{ width: '100%' }}>View Schedule</Button>
-            <Button appearance="subtle" style={{ width: '100%' }}>Browse Rooms</Button>
-          </div>
-        </Section>
+        <TodayPanel
+          refreshToken={bookingRefreshToken}
+          onBookingCancelled={handleBookingChange}
+        />
       </FloatingPanel>
+
+      {/* Centre — Room map */}
+      <FloatingPanel
+        position="center"
+        size="custom"
+        opacity="glass"
+        noPadding={false}
+        style={{
+          left: '340px',
+          right: '340px',
+          top: '16px',
+          bottom: '16px',
+          width: 'auto',
+          height: 'calc(100% - 32px)',
+          transform: 'none',
+        }}
+      >
+        {loadingRoom ? (
+          <div style={{ display: 'flex', height: '100%', alignItems: 'center', justifyContent: 'center' }}>
+            <Spinner size="large" label="Loading room…" />
+          </div>
+        ) : selectedRoomData ? (
+          <RoomMapViewer
+            room={selectedRoomData}
+            onClose={() => setSelectedRoomData(null)}
+            onBookingChange={handleBookingChange}
+          />
+        ) : (
+          <div style={{
+            display: 'flex', flexDirection: 'column', alignItems: 'center',
+            justifyContent: 'center', height: '100%', gap: '12px',
+            color: 'var(--colorNeutralForeground3)', textAlign: 'center', padding: '24px',
+          }}>
+            <div style={{ fontSize: '48px' }}>🗺️</div>
+            <Text size={400} weight="semibold">Select a room to view its map</Text>
+            <Text size={200}>Browse locations and floors on the right, then click a room to start booking</Text>
+          </div>
+        )}
+      </FloatingPanel>
+
+      {/* Right — Location browser */}
+      <FloatingPanel
+        title="Browse"
+        position="center-right"
+        size="small"
+        opacity="glass"
+        style={{ top: '16px', bottom: '16px', height: 'calc(100% - 32px)' }}
+      >
+        <LocationBrowser
+          selectedRoomId={selectedRoomData?.id}
+          onRoomSelect={handleRoomSelect}
+          refreshToken={bookingRefreshToken}
+        />
+      </FloatingPanel>
+
     </FloatingPanelGrid>
   );
 

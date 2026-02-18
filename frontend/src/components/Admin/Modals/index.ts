@@ -11,3 +11,7 @@ export { ManageAllowedGroupsModal } from './ManageAllowedGroupsModal';
 export { UploadRoomMapModal } from './UploadRoomMapModal';
 export { ManageDesksModal } from './ManageDesksModal';
 export { AssignPermanentModal } from './AssignPermanentModal';
+
+// User group modals
+export { CreateEditGroupModal } from './CreateEditGroupModal';
+export { ManageGroupMembersModal } from './ManageGroupMembersModal';

@@ -84,6 +84,7 @@ const useStyles = makeStyles({
     transformOrigin: '0 0',
     pointerEvents: 'none',
     zIndex: 1,
+    transition: 'transform 0.35s cubic-bezier(0.4, 0, 0.2, 1)',
   },
   markersLayer: {
     position: 'absolute',
@@ -96,8 +97,6 @@ const useStyles = makeStyles({
   },
   mapImage: {
     display: 'block',
-    maxWidth: '100%',
-    maxHeight: '100%',
     width: 'auto',
     height: 'auto',
     userSelect: 'none',
@@ -109,9 +108,6 @@ const useStyles = makeStyles({
     left: 0,
     width: '100%',
     height: '100%',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
     pointerEvents: 'none',
   },
   imageWrapper: {
@@ -287,13 +283,13 @@ export const ManageDesksModal: React.FC<ManageDesksModalProps> = ({
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [isPanning, setIsPanning] = useState(false);
   const [panStart, setPanStart] = useState({ x: 0, y: 0 });
-  const [baseZoom, setBaseZoom] = useState(1);
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapWrapperRef = useRef<HTMLDivElement>(null);
   const mapImageRef = useRef<HTMLImageElement>(null);
   const imageWrapperRef = useRef<HTMLDivElement>(null);
   const dragOffsetRef = useRef({ x: 0, y: 0 });
   const initialLoadRef = useRef(true);
+  const isZoomedToDeskRef = useRef(false);
 
   const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
@@ -340,17 +336,12 @@ useEffect(() => {
 
   const setup = () => {
     if (!image.naturalWidth || !image.naturalHeight) return;
-
-    const { zoom, panX, panY } = computeTopLeftFit(
-      container.clientWidth,
-      container.clientHeight,
-      image.naturalWidth,
-      image.naturalHeight
-    );
-
-    //setBaseZoom(zoom);
-    //setZoom(zoom);
-    setPan({ x: panX, y: panY });
+    const containerW = container.clientWidth;
+    const containerH = container.clientHeight;
+    const centeredPanX = (containerW - image.naturalWidth)  / 2;
+    const centeredPanY = (containerH - image.naturalHeight) / 2;
+    setZoom(1);
+    setPan({ x: centeredPanX, y: centeredPanY });
   };
 
   if (image.complete) setup();
@@ -360,42 +351,22 @@ useEffect(() => {
 
 useEffect(() => {
   const handleResize = () => {
+    // Only re-center if not currently zoomed to a desk
+    if (isZoomedToDeskRef.current) return;
     const image = mapImageRef.current;
     const container = mapContainerRef.current;
     if (!image || !container || !image.naturalWidth) return;
-
-    const { zoom, panX, panY } = computeTopLeftFit(
-      container.clientWidth,
-      container.clientHeight,
-      image.naturalWidth,
-      image.naturalHeight
-    );
-
-    //setBaseZoom(zoom);
-    //setZoom(zoom);
-    setPan({ x: panX, y: panY });
+    const containerW = container.clientWidth;
+    const containerH = container.clientHeight;
+    const centeredPanX = (containerW - image.naturalWidth)  / 2;
+    const centeredPanY = (containerH - image.naturalHeight) / 2;
+    setPan({ x: centeredPanX, y: centeredPanY });
   };
 
   window.addEventListener("resize", handleResize);
   return () => window.removeEventListener("resize", handleResize);
 }, []);
 
-
-
-function computeTopLeftFit(
-  containerW: number,
-  containerH: number,
-  naturalW: number,
-  naturalH: number
-) {
-  const fitZoom = Math.min(containerW / naturalW, containerH / naturalH);
-
-  return {
-    zoom: fitZoom,
-    panX: 0,
-    panY: 0,
-  };
-}
 
 
   // ── Zoom / Pan ──────────────────────────────────────────────────
@@ -429,67 +400,71 @@ const zoomToDesk = (deskId: number) => {
   const container = mapContainerRef.current;
   if (!image || !container) return;
 
-  const imageW = image.naturalWidth;
-  const imageH = image.naturalHeight;
-
   const containerW = container.clientWidth;
   const containerH = container.clientHeight;
+  const naturalW = image.naturalWidth;
+  const naturalH = image.naturalHeight;
 
-  // 1️⃣ Define how much you want to zoom in
-  const targetZoom = Math.min(baseZoom * 2, 4); // 2x zoom, capped
+  // The image sits at the wrapper origin (top-left = 0,0).
+  // Desk position in wrapper-local pixels:
+  const deskLocalX = position.x * naturalW;
+  const deskLocalY = position.y * naturalH;
 
-  // 2️⃣ Desk position in image space
-  const deskImageX = position.x * imageW;
-  const deskImageY = position.y * imageH;
+  const targetZoom = 2.5;
 
-  // 3️⃣ Solve for new pan (image space)
-  const newPanX = (containerW / (2 * targetZoom)) - deskImageX;
-  const newPanY = (containerH / (2 * targetZoom)) - deskImageY;
+  // We want: newPan + deskLocal * targetZoom = containerCenter
+  const newPanX = containerW / 2 - deskLocalX * targetZoom;
+  const newPanY = containerH / 2 - deskLocalY * targetZoom;
 
+  isZoomedToDeskRef.current = true;
   setZoom(targetZoom);
-  setPan({
-    x: newPanX,
-    y: newPanY,
-  });
+  setPan({ x: newPanX, y: newPanY });
 };
 
 
 
-  const handleZoomIn  = () => zoomToward(
-    (mapContainerRef.current?.getBoundingClientRect().left ?? 0) + (mapContainerRef.current?.offsetWidth  ?? 0) / 2,
-    (mapContainerRef.current?.getBoundingClientRect().top  ?? 0) + (mapContainerRef.current?.offsetHeight ?? 0) / 2,
-    Math.min(zoom + 0.25, 3)
-  );
-  const handleZoomOut = () => zoomToward(
-    (mapContainerRef.current?.getBoundingClientRect().left ?? 0) + (mapContainerRef.current?.offsetWidth  ?? 0) / 2,
-    (mapContainerRef.current?.getBoundingClientRect().top  ?? 0) + (mapContainerRef.current?.offsetHeight ?? 0) / 2,
-    Math.max(zoom - 0.25, 0.5)
-  );
+  const handleZoomIn  = () => {
+    isZoomedToDeskRef.current = false;
+    zoomToward(
+      (mapContainerRef.current?.getBoundingClientRect().left ?? 0) + (mapContainerRef.current?.offsetWidth  ?? 0) / 2,
+      (mapContainerRef.current?.getBoundingClientRect().top  ?? 0) + (mapContainerRef.current?.offsetHeight ?? 0) / 2,
+      Math.min(zoom + 0.25, 4)
+    );
+  };
+  const handleZoomOut = () => {
+    isZoomedToDeskRef.current = false;
+    zoomToward(
+      (mapContainerRef.current?.getBoundingClientRect().left ?? 0) + (mapContainerRef.current?.offsetWidth  ?? 0) / 2,
+      (mapContainerRef.current?.getBoundingClientRect().top  ?? 0) + (mapContainerRef.current?.offsetHeight ?? 0) / 2,
+      Math.max(zoom - 0.25, 0.25)
+    );
+  };
 const handleResetView = () => {
   const image = mapImageRef.current;
   const container = mapContainerRef.current;
   if (!image || !container || !image.naturalWidth) return;
 
-  const { zoom, panX, panY } = computeTopLeftFit(
-    container.clientWidth,
-    container.clientHeight,
-    image.naturalWidth,
-    image.naturalHeight
-  );
+  const containerW = container.clientWidth;
+  const containerH = container.clientHeight;
+  const naturalW   = image.naturalWidth;
+  const naturalH   = image.naturalHeight;
 
-  setZoom(zoom);
-  setPan({ x: panX, y: panY });
+  // At zoom=1 the image is rendered at its natural size.
+  // Center it in the container.
+  const centeredPanX = (containerW - naturalW) / 2;
+  const centeredPanY = (containerH - naturalH) / 2;
+
+  isZoomedToDeskRef.current = false;
+  setZoom(1);
+  setPan({ x: centeredPanX, y: centeredPanY });
 };
 
 
 const handleWheel = (e: React.WheelEvent) => {
   e.preventDefault();
-
-  // Determine zoom delta
+  isZoomedToDeskRef.current = false; // manual zoom clears desk-zoom state
   const delta = e.deltaY > 0 ? -0.15 : 0.15;
-  const newZoom = Math.max(baseZoom * 0.8, Math.min(3, zoom + delta));
-
-  // Zoom toward the cursor
+  const newZoom = Math.max(0.25, Math.min(4, zoom + delta));
   zoomToward(e.clientX, e.clientY, newZoom);
 };
 
@@ -657,36 +632,9 @@ const handleListDeskClick = (desk: Desk) => {
 
   if (newSelectedId === null) {
     handleResetView();
-    return;
+  } else {
+    zoomToDesk(desk.id);
   }
-
-  const pos = deskPositions.get(desk.id);
-  const container = mapContainerRef.current;
-  const imgWrapper = imageWrapperRef.current;
-
-  if (!pos || !container || !imgWrapper) return;
-
-  const containerRect = container.getBoundingClientRect();
-  const imageRect = imgWrapper.getBoundingClientRect();
-
-  // Desk position in *screen space*
-  const deskScreenX = imageRect.left + pos.x * imageRect.width;
-  const deskScreenY = imageRect.top + pos.y * imageRect.height;
-
-  const containerCenterX = containerRect.left + containerRect.width / 2;
-  const containerCenterY = containerRect.top + containerRect.height / 2;
-
-  const deltaX = containerCenterX - deskScreenX;
-  const deltaY = containerCenterY - deskScreenY;
-
-  setPan(prev => ({
-    x: prev.x + deltaX,
-    y: prev.y + deltaY,
-  }));
-
-  setTimeout(() => {
-    markerRefs.current.get(desk.id)?.click();
-  }, 100);
 };
 
 
@@ -800,9 +748,9 @@ const handleListDeskClick = (desk: Desk) => {
                 {/* ── Right: map ── */}
                 <div className={styles.rightPanel}>
                   <div className={styles.mapControls}>
-                    <Button appearance="subtle" icon={<SubtractSquare20Regular />} size="small" onClick={handleZoomOut} disabled={zoom <= 0.5} title="Zoom out" />
+                    <Button appearance="subtle" icon={<SubtractSquare20Regular />} size="small" onClick={handleZoomOut} disabled={zoom <= 0.25} title="Zoom out" />
                     <Text size={200}>{Math.round(zoom * 100)}%</Text>
-                    <Button appearance="subtle" icon={<AddSquare20Regular />} size="small" onClick={handleZoomIn} disabled={zoom >= 3} title="Zoom in" />
+                    <Button appearance="subtle" icon={<AddSquare20Regular />} size="small" onClick={handleZoomIn} disabled={zoom >= 4} title="Zoom in" />
                     <Button appearance="subtle" icon={<ArrowCounterclockwise20Regular />} size="small" onClick={handleResetView} title="Reset view" />
                   </div>
 
@@ -820,7 +768,10 @@ const handleListDeskClick = (desk: Desk) => {
                       <div
                         ref={mapWrapperRef}
                         className={styles.mapWrapper}
-                        style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})` }}
+                        style={{
+                          transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+                          transition: isPanning || draggingDeskId !== null ? 'none' : undefined,
+                        }}
                       >
                         {/* markerLayer centres imageWrapper inside the full-size wrapper */}
                         <div className={styles.markerLayer}>
@@ -860,7 +811,15 @@ const handleListDeskClick = (desk: Desk) => {
                                     if (isEditing) handleDeskMouseDown(e, desk.id);
                                   }}
                                 >
-                                  <Menu onOpenChange={(_, d) => { if (d.open) setSelectedDeskId(desk.id); }}>
+                                  <Menu onOpenChange={(_, d) => {
+                                    if (d.open) {
+                                      setSelectedDeskId(desk.id);
+                                      zoomToDesk(desk.id);
+                                    } else {
+                                      setSelectedDeskId(null);
+                                      handleResetView();
+                                    }
+                                  }}>
                                     <MenuTrigger disableButtonEnhancement>
                                       <div
                                         ref={el => {

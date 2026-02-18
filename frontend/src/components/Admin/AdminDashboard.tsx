@@ -15,6 +15,7 @@ import { FloatingPanelGrid, FloatingPanel } from '../Layout';
 import { LocationManagement } from './LocationManagement';
 import { RoomManagement } from './RoomManagement';
 import { UserGroupManagement } from './UserGroupManagement';
+import AdminSettings from './AdminSettings';
 
 const useStyles = makeStyles({
   tabsContainer: {
@@ -71,10 +72,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
   );
 
   const renderSettingsTab = () => (
-    <div className={styles.placeholder}>
-      <Settings20Regular style={{ fontSize: '48px', marginBottom: '16px' }} />
-      <div>Admin Settings - Coming Soon</div>
-    </div>
+    <AdminSettings/>
   );
 
   return (
