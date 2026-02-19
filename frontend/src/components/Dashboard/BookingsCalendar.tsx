@@ -394,6 +394,12 @@ export interface CalendarGridProps {
   onCancelBooking?: (b: Booking) => void;
   onEditBooking?: (b: Booking) => void;
   cancellingId?: number | null;
+  /**
+   * When set (edit mode in BookingModal), event blocks for THIS booking ID become
+   * click-transparent so the user can click through them to pick a new time.
+   * All other booking blocks remain non-interactive in clickMode.
+   */
+  editingBookingId?: number | null;
 }
 
 // Internal drag state (lives in a ref — no re-renders during drag)
@@ -409,9 +415,24 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
   view, anchor, days, bookingsByDay,
   drafts = [], interactive = false, clickMode = false, calColDateAttr,
   onInteract, onCancelBooking, onEditBooking, cancellingId,
+  editingBookingId = null,
 }) => {
   const s = useCalStyles();
   const [now, setNow] = useState(new Date());
+
+  // ── Past-time guards (Bug 1) ──
+  // Returns true if the calendar date is strictly before today (whole-day check)
+  const isPastDate = useCallback((d: Date): boolean => {
+    const today = calStartOfDay(new Date());
+    return calStartOfDay(d) < today;
+  }, []);
+
+  // Returns true if date+hour combination is before current moment (30-min snapped)
+  const isPastHour = useCallback((d: Date, snappedHour: number): boolean => {
+    const target = new Date(d.getFullYear(), d.getMonth(), d.getDate(),
+      Math.floor(snappedHour), snappedHour % 1 === 0.5 ? 30 : 0, 0, 0);
+    return target < new Date();
+  }, []);
 
   // ── Live preview of the in-progress drag (rendered via React state) ──
   const [liveDrafts, setLiveDrafts] = useState<DraftSlot[]>([]);
@@ -501,15 +522,19 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
     const hour = snapHour(getHourFromY(e.clientY, colIdx));
     const date = days[colIdx] ? calDateStr(days[colIdx]) : undefined;
     if (!date) return;
+    // Bug 1: reject clicks in the past
+    if (days[colIdx] && isPastHour(days[colIdx], hour)) return;
     const timeStr = hourToTimeStr(hour);
     onInteract({ startDate: date, endDate: date, startTime: timeStr, endTime: timeStr });
-  }, [interactive, clickMode, getHourFromY, days, onInteract]);
+  }, [interactive, clickMode, getHourFromY, days, onInteract, isPastHour]);
 
   const handleColMouseDown = useCallback((e: React.MouseEvent, colIdx: number) => {
     if (!interactive || e.button !== 0 || clickMode) return;
     e.preventDefault();
 
     const hour = snapHour(getHourFromY(e.clientY, colIdx));
+    // Bug 1: reject drag starts in the past
+    if (days[colIdx] && isPastHour(days[colIdx], hour)) return;
     dragRef.current = { active: true, startColIdx: colIdx, startHour: hour, curColIdx: colIdx, curHour: hour + 0.5 };
 
     const slots = buildDraftSlots(colIdx, hour, colIdx, hour + 0.5);
@@ -518,7 +543,13 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
     const onMove = (ev: MouseEvent) => {
       if (!dragRef.current.active) return;
       const ci   = getColIdxFromX(ev.clientX);
-      const hour = snapHour(getHourFromY(ev.clientY, ci));
+      const rawHour = snapHour(getHourFromY(ev.clientY, ci));
+      // Clamp the cursor position: if the hovered column is in the past,
+      // snap to "now" so the selection never extends into past time.
+      const colDay = days[ci];
+      const hour = (colDay && isPastHour(colDay, rawHour))
+        ? snapHour(new Date().getHours() + new Date().getMinutes() / 60)
+        : rawHour;
       dragRef.current.curColIdx = ci;
       dragRef.current.curHour   = hour;
       setLiveDrafts(buildDraftSlots(
@@ -553,11 +584,13 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
 
     document.addEventListener('mousemove', onMove);
     document.addEventListener('mouseup',   onUp);
-  }, [interactive, clickMode, getColIdxFromX, getHourFromY, buildDraftSlots, onInteract]);
+  }, [interactive, clickMode, getColIdxFromX, getHourFromY, buildDraftSlots, onInteract, isPastHour]);
 
   // ── Month click-click ──
-  const handleMonthCellClick = useCallback((dateKey: string) => {
+  const handleMonthCellClick = useCallback((dateKey: string, d: Date) => {
     if (!interactive || !onInteract) return;
+    // Bug 1: reject clicks on past dates
+    if (isPastDate(d)) return;
     if (!pendingDate) {
       // First click — set pending
       setPendingDate(dateKey);
@@ -570,7 +603,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
       setHoverDate(null);
       onInteract({ startDate: d1, endDate: d2, startTime: '09:00', endTime: '17:00' });
     }
-  }, [interactive, pendingDate, onInteract]);
+  }, [interactive, pendingDate, onInteract, isPastDate]);
 
   // ── Now line ──
   const nowTopPct = Math.max(0, Math.min(100,
@@ -700,20 +733,25 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
               key < (rangeStart < rangeEnd ? rangeEnd : rangeStart);
             const isRangeEnd = rangeEnd !== null && rangeEnd !== rangeStart && key === rangeEnd && pendingDate !== null;
 
+            const isPast = interactive && isPastDate(d);
+            // Suppress range-highlight colouring on past cells
+            const showInRange  = isInRange  && !isPast;
+            const showRangeEnd = isRangeEnd && !isPast;
             return (
               <div
                 key={i}
                 className={[
                   s.monthCell,
-                  !inMonth     ? s.monthCellOtherMonth  : '',
-                  todayDay     ? s.monthCellToday        : '',
-                  isPending    ? s.monthCellPending      : '',
-                  isInRange    ? s.monthCellInRange      : '',
-                  isRangeEnd   ? s.monthCellPending      : '',
-                  interactive  ? s.monthCellInteractive  : '',
+                  !inMonth        ? s.monthCellOtherMonth  : '',
+                  todayDay        ? s.monthCellToday        : '',
+                  isPending       ? s.monthCellPending      : '',
+                  showInRange     ? s.monthCellInRange      : '',
+                  showRangeEnd    ? s.monthCellPending      : '',
+                  interactive && !isPast ? s.monthCellInteractive : '',
                 ].join(' ')}
-                onClick={() => handleMonthCellClick(key)}
-                onMouseEnter={interactive && pendingDate ? () => setHoverDate(key) : undefined}
+                style={isPast ? { opacity: 0.45, cursor: 'not-allowed' } : undefined}
+                onClick={!isPast ? () => handleMonthCellClick(key, d) : undefined}
+                onMouseEnter={interactive && pendingDate && !isPast ? () => setHoverDate(key) : undefined}
                 onMouseLeave={interactive && pendingDate ? () => setHoverDate(null) : undefined}
               >
                 <div className={`${s.monthDayNum} ${todayDay ? s.monthDayNumToday : ''}`}>
@@ -774,15 +812,19 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
             {days.map((d, i) => {
               const key  = calDateStr(d);
               const evts = bookingsByDay.get(key) ?? [];
+              const colIsPast = interactive && isPastDate(d);
               return (
                 <div
                   key={i}
                   ref={el => { colRefs.current[i] = el; }}
-                  className={`${s.dayCol} ${interactive ? s.dayColInteractive : ''}`}
-                  style={i === 0 ? { borderLeft: 'none' } : {}}
+                  className={`${s.dayCol} ${interactive && !colIsPast ? s.dayColInteractive : ''}`}
+                  style={{
+                    ...(i === 0 ? { borderLeft: 'none' } : {}),
+                    ...(colIsPast ? { opacity: 0.45, cursor: 'not-allowed' } : {}),
+                  }}
                   data-cal-col={calColDateAttr?.[i] ?? calDateStr(d)}
-                  onMouseDown={interactive && !clickMode ? (e) => handleColMouseDown(e, i) : undefined}
-                  onClick={interactive && clickMode ? (e) => handleColClick(e, i) : undefined}
+                  onMouseDown={interactive && !clickMode && !colIsPast ? (e) => handleColMouseDown(e, i) : undefined}
+                  onClick={interactive && clickMode && !colIsPast ? (e) => handleColClick(e, i) : undefined}
                 >
                   {renderHourLines()}
                   {renderNowLine(d)}
@@ -798,29 +840,44 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
                     if (visEnd <= visStart) return null;
                     const topP    = ((visStart - CAL_HOUR_START) / CAL_HOUR_RANGE) * 100;
                     const heightP = Math.max(1.5, ((visEnd - visStart) / CAL_HOUR_RANGE) * 100);
-                    const canEdit = isOwn && !!onEditBooking;
+                    const canEdit = isOwn && !!onEditBooking && !clickMode;
+                    // Bug 2: In edit mode, the booking being edited must be click-transparent
+                    //         so the user can pick a new time overlapping it.
+                    // Bug 3: In clickMode (BookingModal), ALL event blocks are transparent to
+                    //         clicks so the column handler always receives them. The Tooltip
+                    //         is still shown on hover — we just prevent click interception.
+                    const isEditingThis = clickMode && editingBookingId === booking.id;
+                    const blockPointerEvents =
+                      (dragRef.current.active)   ? 'none'  // during drag: never block
+                      : clickMode                ? 'none'  // Bug 3: in booking modal, never intercept clicks
+                      : 'auto';                            // normal calendar view: interactive as usual
                     return (
                     <Tooltip key={`${booking.id}-${calDateStr(d)}`}
                       content={<EventPopup booking={booking} isOwn={isOwn}
-                        onEdit={isOwn && onEditBooking ? () => onEditBooking(booking) : undefined}
-                        onCancel={isOwn && onCancelBooking ? () => onCancelBooking(booking) : undefined}
+                        onEdit={isOwn && onEditBooking && !clickMode ? () => onEditBooking(booking) : undefined}
+                        onCancel={isOwn && onCancelBooking && !clickMode ? () => onCancelBooking(booking) : undefined}
                         cancelling={cancellingId === booking.id} />}
                       relationship="description" positioning="below-start" withArrow>
                       <div
-                        className={`${s.eventBlock} ${!isOwn ? s.eventBlockOther : ''}`}
+                        className={`${s.eventBlock} ${!isOwn ? s.eventBlockOther : ''} ${isEditingThis ? s.eventBlockDraft : ''}`}
                         style={{
                           top: `${topP}%`,
                           height: `${heightP}%`,
-                          pointerEvents: interactive && dragRef.current.active ? 'none' : 'auto',
-                          cursor: canEdit ? 'pointer' : undefined,
+                          pointerEvents: blockPointerEvents,
+                          cursor: canEdit ? 'pointer' : clickMode ? 'default' : undefined,
+                          // Bug 2: visually indicate the editing booking is click-through
+                          opacity: isEditingThis ? 0.5 : undefined,
                         }}
-                        onClick={canEdit ? (e) => { e.stopPropagation(); onEditBooking(booking); } : undefined}
+                        onClick={canEdit ? (e) => { e.stopPropagation(); onEditBooking!(booking); } : undefined}
                       >
                         <div className={`${s.eventTitle} ${!isOwn ? s.eventTitleOther : ''}`}>{booking.desk.name}</div>
                         <div className={`${s.eventMeta} ${!isOwn ? s.eventMetaOther : ''}`}>
                           {calFormatTime(booking.start_time)}–{calFormatTime(booking.end_time)}
                         </div>
                         {!isOwn && <div className={`${s.eventMeta} ${s.eventMetaOther}`}>{booking.username}</div>}
+                        {isEditingThis && (
+                          <div className={`${s.eventMeta} ${s.eventTitleDraft}`}>click through to edit</div>
+                        )}
                       </div>
                     </Tooltip>
                     );

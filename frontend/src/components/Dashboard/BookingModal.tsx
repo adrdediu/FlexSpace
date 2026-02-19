@@ -474,6 +474,23 @@ export const BookingModal: React.FC<BookingModalProps> = ({
     return new Date(prev.getFullYear(), prev.getMonth() + dir, 1);
   });
 
+  // Disable the back-navigation button when going back would fully leave today's window.
+  const isBackDisabled = useMemo(() => {
+    const today = new Date();
+    if (calView === 'day') {
+      return calAnchor <= calStartOfDay(today);
+    }
+    if (calView === 'week') {
+      const prevWeekEnd = calAddDays(calAnchor, -1);
+      return prevWeekEnd < calStartOfDay(today);
+    }
+    return (
+      calAnchor.getFullYear() < today.getFullYear() ||
+      (calAnchor.getFullYear() === today.getFullYear() &&
+       calAnchor.getMonth() <= today.getMonth())
+    );
+  }, [calView, calAnchor]);
+
   const calTitle = useMemo(() => {
     if (calView === 'day') return calFormatShortDate(calAnchor);
     if (calView === 'week') {
@@ -487,6 +504,10 @@ export const BookingModal: React.FC<BookingModalProps> = ({
 
   // ── Calendar click-click interaction handler ──
   const handleCalInteract = useCallback((sel: CalendarInteraction) => {
+    // Bug 1 (second layer): reject any interaction entirely in the past
+    const clickedDt = new Date(`${sel.startDate}T${sel.startTime}:00`);
+    if (clickedDt < new Date()) return;
+
     if (calView === 'month') {
       // Month: CalendarGrid already manages two-click day range internally
       setStartDate(sel.startDate);
@@ -641,6 +662,13 @@ export const BookingModal: React.FC<BookingModalProps> = ({
           const snapped = snapHour(hour);
           const colDate = col.getAttribute('data-cal-col');
           if (colDate) {
+            // Guard: do not emit a hover time that is in the past
+            const colDay = new Date(colDate + 'T00:00:00');
+            const target = new Date(
+              colDay.getFullYear(), colDay.getMonth(), colDay.getDate(),
+              Math.floor(snapped), snapped % 1 === 0.5 ? 30 : 0, 0, 0
+            );
+            if (target < new Date()) return;
             setHoverDateState(colDate);
             setHoverTime(hourToTimeStr(snapped));
           }
@@ -817,7 +845,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
               {/* Toolbar */}
               <div className={styles.calToolbar}>
                 <Button size="small" appearance="subtle" icon={<ChevronLeft20Regular />}
-                  onClick={() => navigateCal(-1)} />
+                  onClick={() => navigateCal(-1)} disabled={isBackDisabled} />
                 <Button size="small" appearance="subtle" icon={<ChevronRight20Regular />}
                   onClick={() => navigateCal(1)} />
                 <Text className={styles.calTitle}>{calTitle}</Text>
@@ -872,6 +900,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                     onInteract={handleCalInteract}
                     calColDateAttr={calView !== 'month' ? calDays.map(d => calDateStr(d)) : undefined}
                     onEditBooking={onEditBooking}
+                    editingBookingId={editingBooking?.id ?? null}
                   />
                 </div>
               )}
