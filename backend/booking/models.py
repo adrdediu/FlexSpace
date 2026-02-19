@@ -239,6 +239,15 @@ class Booking(models.Model):
     def clean(self):
         super().clean()
 
+        from django.utils import timezone as _tz
+        now = _tz.now()
+
+        if self.start_time and self.start_time < now:
+            raise ValidationError({'start_time': 'Booking start time cannot be in the past.'})
+
+        if self.start_time and self.end_time and self.end_time <= self.start_time:
+            raise ValidationError({'end_time': 'end_time must be after start_time.'})
+
         if self.desk.is_permanent and self.desk.permanent_assignee != self.user:
             raise ValidationError({
                 'desk': f'This desk is permanently assigned to {self.desk.permanent_assignee.username}. Only they can book it.' # type: ignore

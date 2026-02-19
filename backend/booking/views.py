@@ -298,9 +298,9 @@ class BookingViewSet(viewsets.ModelViewSet):
 
             if start_dt and end_dt:
                 if is_naive(start_dt):
-                    start_dt = start_dt.replace(tzinfo=datetime.timezone.utc)
+                    start_dt = start_dt.replace(tzinfo=dt_timezone.utc)
                 if is_naive(end_dt):
-                    end_dt = end_dt.replace(tzinfo=datetime.timezone.utc)
+                    end_dt = end_dt.replace(tzinfo=dt_timezone.utc)
 
                 qs = qs.filter(start_time__lt=end_dt, end_time__gt=start_dt)
         
@@ -399,6 +399,12 @@ class BookingViewSet(viewsets.ModelViewSet):
         start_dt = datetime.datetime.fromisoformat(self.request.data["start_time"].replace('Z','+00:00'))
         end_dt = datetime.datetime.fromisoformat(self.request.data["end_time"].replace('Z','+00:00'))
 
+        now = timezone.now()
+        if start_dt < now:
+            raise ValidationError({"detail": "Booking start time cannot be in the past."})
+        if end_dt <= start_dt:
+            raise ValidationError({"detail": "end_time must be after start_time."})
+
         with transaction.atomic():
             desk_locked = Desk.objects.select_for_update().get(pk=desk_id)
 
@@ -484,14 +490,17 @@ class BookingViewSet(viewsets.ModelViewSet):
             return Response({"detail": "Desk currently locked by another user."},status=423)
         
         parsed = []
+        now = timezone.now()
         for iv in intervals:
             try:
                 s = datetime.datetime.fromisoformat(iv["start_time"].replace('Z','+00:00'))
                 e = datetime.datetime.fromisoformat(iv["end_time"].replace('Z','+00:00'))
             except Exception:
                 return Response({"detail":"Invalid interval timestamps"}, status = 400)
-            if e<= s:
-                return Response({"detail": "end_time must be after start_time"}, status = 400)
+            if s < now:
+                return Response({"detail": "Booking start time cannot be in the past."}, status=400)
+            if e <= s:
+                return Response({"detail": "end_time must be after start_time"}, status=400)
             parsed.append((s, e))
 
         parsed.sort(key=lambda t:t[0])
@@ -595,8 +604,11 @@ class BookingViewSet(viewsets.ModelViewSet):
             except Exception:
                 raise ValidationError({"detail": "Invalid timestamps"})
 
+            now = timezone.now()
+            if s_dt < now:
+                raise ValidationError({"detail": "Booking start time cannot be in the past."})
             if e_dt <= s_dt:
-                raise ValidationError({"detail": "End_time must be after Start_time"})
+                raise ValidationError({"detail": "end_time must be after start_time."})
             
             with transaction.atomic():
                 desk_locked = Desk.objects.select_for_update().get(pk=desk.pk)
@@ -622,7 +634,7 @@ class BookingViewSet(viewsets.ModelViewSet):
         response= super().partial_update(request, *args, **kwargs) if partial else super().update(request, *args, **kwargs)
         desk.refresh_booking_state()
         self._broadcast_desk_status(desk)
-        self._broadcast_update_bookings(desk, upsert_qs==Booking.objects.filter(pk=booking.pk))
+        self._broadcast_update_bookings(desk, upsert_qs=Booking.objects.filter(pk=booking.pk))
         return response
     
     @action(detail=True, methods=['post'], url_path='edit_intervals')
@@ -650,11 +662,11 @@ class BookingViewSet(viewsets.ModelViewSet):
         user = request.user
 
         if base_booking.user != user:
-            return Response({"detail","You can only edit your own bookings"}, status=403)
+            return Response({"detail": "You can only edit your own bookings"}, status=403)
         
         payload = request.data.get("intervals", [])
         if not isinstance(payload, list):
-            return Response("detail", "intervals must be a list", status=400)
+            return Response({"detail": "intervals must be a list"}, status=400)
         
         if len(payload) == 0:
             deleted_id = base_booking.id
@@ -674,6 +686,7 @@ class BookingViewSet(viewsets.ModelViewSet):
                 "intervals": [],
             }, status = 200)
         
+        now = timezone.now()
         parsed = []
         for iv in payload:
             try:
@@ -685,6 +698,8 @@ class BookingViewSet(viewsets.ModelViewSet):
                 return Response({"detail": "Invalid interval timestamps"}, status = 400)
             if not s_dt or not e_dt or e_dt <= s_dt:
                 return Response({"detail": "Each interval must have valid start_time < end_time"}, status=400)
+            if s_dt < now:
+                return Response({"detail": "Booking start time cannot be in the past."}, status=400)
             parsed.append((s_dt, e_dt))
 
         parsed.sort(key = lambda t: t[0])
@@ -692,7 +707,7 @@ class BookingViewSet(viewsets.ModelViewSet):
         def merge_intervals(itvs, adjacent = True):
             if not itvs:
                 return []
-            merged = [list[itvs[0]]]
+            merged = [list(itvs[0])]
             for s,e in itvs[1:]:
                 last_s, last_e = merged[-1]
                 if s <= last_e or (adjacent and s == last_e):
