@@ -4,7 +4,7 @@ import {
 } from '@fluentui/react-components';
 import {
   ChevronLeft20Regular, ChevronRight20Regular,
-  Delete20Regular, Clock20Regular, DoorRegular, BuildingRegular,
+  Delete20Regular, Edit20Regular, Clock20Regular, DoorRegular, BuildingRegular,
   CalendarLtr20Regular, CalendarDay20Regular,
   CalendarWeekNumbers20Regular, CalendarMonth20Regular,
 } from '@fluentui/react-icons';
@@ -36,6 +36,10 @@ export function calIsSameDay(a: Date, b: Date): boolean {
          a.getDate()     === b.getDate();
 }
 export function calIsToday(d: Date): boolean { return calIsSameDay(d, new Date()); }
+/** Format a local Date to YYYY-MM-DD without UTC conversion (avoids off-by-one for timezones ahead of UTC). */
+export function calDateStr(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
 export function calFormatTime(iso: string): string {
   try { return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }
   catch { return ''; }
@@ -62,7 +66,37 @@ export function calHeightPct(s: string, e: string): number {
 const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const HOURS    = Array.from({ length: CAL_HOUR_RANGE + 1 }, (_, i) => CAL_HOUR_START + i);
 
-// ── Snap helpers ──────────────────────────────────────────────────────────────
+/** Expand bookings into a day-keyed map, spreading multi-day bookings across every day they cover. */
+export function expandBookingsByDay(
+  bookings: Booking[],
+  myUsername?: string
+): Map<string, Array<{ booking: Booking; isOwn: boolean; dayStart: string; dayEnd: string }>> {
+  const map = new Map<string, Array<{ booking: Booking; isOwn: boolean; dayStart: string; dayEnd: string }>>();
+
+  bookings.forEach(b => {
+    const isOwn = !!myUsername && b.username === myUsername;
+    const start = new Date(b.start_time);
+    const end   = new Date(b.end_time);
+    // Walk from start day to end day
+    let cur = calStartOfDay(start);
+    const endDay = calStartOfDay(end);
+    while (cur <= endDay) {
+      const key = calDateStr(cur);
+      const isFirst = calIsSameDay(cur, start);
+      const isLast  = calIsSameDay(cur, end);
+      // Per-day display times: clamp to the actual booking times on boundary days
+      const dayStart = isFirst ? b.start_time : `${key}T00:00:00`;
+      const dayEnd   = isLast  ? b.end_time   : `${key}T23:59:59`;
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push({ booking: b, isOwn, dayStart, dayEnd });
+      cur = calAddDays(cur, 1);
+    }
+  });
+
+  return map;
+}
+
+
 function snapHour(h: number): number { return Math.round(h * 2) / 2; }
 
 function hourToTimeStr(h: number): string {
@@ -129,7 +163,7 @@ export const useCalStyles = makeStyles({
   },
   dayColumns: { display: 'flex', flex: 1, position: 'relative' },
   dayCol: { flex: 1, position: 'relative', borderLeft: `1px solid ${tokens.colorNeutralStroke2}` },
-  dayColInteractive: { cursor: 'crosshair' },
+  dayColInteractive: { cursor: 'pointer' },
   hourLine: {
     position: 'absolute', left: 0, right: 0, height: '1px',
     backgroundColor: tokens.colorNeutralStroke2, pointerEvents: 'none',
@@ -282,7 +316,8 @@ export const useCalStyles = makeStyles({
 const EventPopup: React.FC<{
   booking: Booking; isOwn: boolean;
   onCancel?: () => void; cancelling: boolean;
-}> = ({ booking, isOwn, onCancel, cancelling }) => {
+  onEdit?: () => void;
+}> = ({ booking, isOwn, onCancel, cancelling, onEdit }) => {
   const s = useCalStyles();
   return (
     <div className={s.eventPopup}>
@@ -304,12 +339,22 @@ const EventPopup: React.FC<{
           Booked by {booking.username}
         </div>
       )}
+      {isOwn && onEdit && (
+        <Button
+          appearance="subtle" size="small"
+          icon={<Edit20Regular />}
+          onClick={onEdit}
+          style={{ marginTop: '4px' }}
+        >
+          Edit booking
+        </Button>
+      )}
       {isOwn && onCancel && (
         <Button
           appearance="subtle" size="small"
           icon={cancelling ? <Spinner size="tiny" /> : <Delete20Regular />}
           onClick={onCancel} disabled={cancelling}
-          style={{ marginTop: '4px', color: tokens.colorPaletteRedForeground1 }}
+          style={{ color: tokens.colorPaletteRedForeground1 }}
         >
           Cancel booking
         </Button>
@@ -336,11 +381,18 @@ export interface CalendarGridProps {
   view: ViewMode;
   anchor: Date;
   days: Date[];
-  bookingsByDay: Map<string, Array<{ booking: Booking; isOwn: boolean }>>;
+  bookingsByDay: Map<string, Array<{ booking: Booking; isOwn: boolean; dayStart?: string; dayEnd?: string }>>;
   drafts?: DraftSlot[];
   interactive?: boolean;
+  /** When true: single click fires onInteract with a point (startDate=endDate, startTime=endTime).
+   *  The caller manages the two-step click-click logic.
+   *  When false (default): drag to select fires onInteract with full range. */
+  clickMode?: boolean;
+  /** Optional array of date strings to attach as data-cal-col attributes on each day column (for external hover tracking). */
+  calColDateAttr?: string[];
   onInteract?: (sel: CalendarInteraction) => void;
   onCancelBooking?: (b: Booking) => void;
+  onEditBooking?: (b: Booking) => void;
   cancellingId?: number | null;
 }
 
@@ -355,8 +407,8 @@ interface DragState {
 
 export const CalendarGrid: React.FC<CalendarGridProps> = ({
   view, anchor, days, bookingsByDay,
-  drafts = [], interactive = false, onInteract,
-  onCancelBooking, cancellingId,
+  drafts = [], interactive = false, clickMode = false, calColDateAttr,
+  onInteract, onCancelBooking, onEditBooking, cancellingId,
 }) => {
   const s = useCalStyles();
   const [now, setNow] = useState(new Date());
@@ -416,7 +468,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
     if (fromCol === toCol) {
       if (fromHour > toHour) [fromHour, toHour] = [toHour, fromHour];
       if (toHour - fromHour < 0.5) toHour = fromHour + 0.5;
-      const date = days[fromCol]?.toISOString().slice(0, 10);
+      const date = days[fromCol] ? calDateStr(days[fromCol]) : undefined;
       if (!date) return [];
       return [{ date, start: hourToTimeStr(fromHour), end: hourToTimeStr(toHour), label: '' }];
     }
@@ -429,7 +481,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
 
     const result: DraftSlot[] = [];
     for (let ci = fromCol; ci <= toCol; ci++) {
-      const date = days[ci]?.toISOString().slice(0, 10);
+      const date = days[ci] ? calDateStr(days[ci]) : undefined;
       if (!date) continue;
       const isFirst = ci === fromCol;
       const isLast  = ci === toCol;
@@ -444,8 +496,17 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
   }, [days]);
 
   // ── Mouse handlers ──
+  const handleColClick = useCallback((e: React.MouseEvent, colIdx: number) => {
+    if (!interactive || !clickMode || !onInteract) return;
+    const hour = snapHour(getHourFromY(e.clientY, colIdx));
+    const date = days[colIdx] ? calDateStr(days[colIdx]) : undefined;
+    if (!date) return;
+    const timeStr = hourToTimeStr(hour);
+    onInteract({ startDate: date, endDate: date, startTime: timeStr, endTime: timeStr });
+  }, [interactive, clickMode, getHourFromY, days, onInteract]);
+
   const handleColMouseDown = useCallback((e: React.MouseEvent, colIdx: number) => {
-    if (!interactive || e.button !== 0) return;
+    if (!interactive || e.button !== 0 || clickMode) return;
     e.preventDefault();
 
     const hour = snapHour(getHourFromY(e.clientY, colIdx));
@@ -492,7 +553,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
 
     document.addEventListener('mousemove', onMove);
     document.addEventListener('mouseup',   onUp);
-  }, [interactive, getColIdxFromX, getHourFromY, buildDraftSlots, onInteract]);
+  }, [interactive, clickMode, getColIdxFromX, getHourFromY, buildDraftSlots, onInteract]);
 
   // ── Month click-click ──
   const handleMonthCellClick = useCallback((dateKey: string) => {
@@ -541,26 +602,40 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
   const activeDrafts = liveDrafts.length > 0 ? liveDrafts : drafts;
 
   const renderDraftBlocks = (d: Date) => {
-    const key = d.toISOString().slice(0, 10);
+    const key = calDateStr(d);
+
+    // Helper: convert HH:MM string to decimal hours
+    const toH = (t: string) => { const [h, m] = t.split(':').map(Number); return h + m / 60; };
+
     return activeDrafts
-      .filter(dr => dr.date === key && dr.start < dr.end)
+      .filter(dr => dr.date === key)
       .map((dr, i) => {
-        const startIso = `${dr.date}T${dr.start}:00`;
-        const endIso   = `${dr.date}T${dr.end}:00`;
-        const topP   = calTopPct(startIso);
-        const heightP = calHeightPct(startIso, endIso);
+        // Clamp displayed start/end to the visible grid window
+        const rawStart = toH(dr.start);
+        const rawEnd   = toH(dr.end);
+        const visStart = Math.max(rawStart, CAL_HOUR_START);
+        const visEnd   = Math.min(rawEnd,   CAL_HOUR_END);
+
+        // Skip blocks entirely outside the visible range
+        if (visEnd <= visStart) return null;
+
+        const topP    = ((visStart - CAL_HOUR_START) / CAL_HOUR_RANGE) * 100;
+        const heightP = Math.max(1.5, ((visEnd - visStart) / CAL_HOUR_RANGE) * 100);
+
+        // Label: show actual (unclamped) time range so user sees e.g. "00:00 – 23:59"
+        const timeRange = `${dr.start} – ${dr.end}`;
+
         return (
           <div key={`draft-${i}`}
             className={`${s.eventBlock} ${s.eventBlockDraft}`}
             style={{ top: `${topP}%`, height: `${heightP}%` }}
           >
             <div className={`${s.eventTitle} ${s.eventTitleDraft}`}>
-              {dr.label || `${dr.start} – ${dr.end}`}
+              {dr.label || timeRange}
             </div>
             {dr.label && (
-              <div className={`${s.eventMeta} ${s.eventMetaOther}`}>{dr.start} – {dr.end}</div>
+              <div className={`${s.eventMeta} ${s.eventMetaOther}`}>{timeRange}</div>
             )}
-            {/* Floating time tooltip at top of block */}
             {liveDrafts.length > 0 && i === 0 && (
               <div className={s.dragTooltip} style={{ top: '-18px' }}>
                 {dr.start}
@@ -568,11 +643,12 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
             )}
           </div>
         );
-      });
+      })
+      .filter(Boolean);
   };
 
   const renderMonthDraftBlocks = (d: Date) => {
-    const key = d.toISOString().slice(0, 10);
+    const key = calDateStr(d);
     return (liveDrafts.length > 0 ? liveDrafts : drafts)
       .filter(dr => dr.date === key && dr.start < dr.end)
       .map((dr, i) => (
@@ -610,7 +686,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
           {cells.map((d, i) => {
             const inMonth  = d.getMonth() === anchor.getMonth();
             const todayDay = calIsToday(d);
-            const key      = d.toISOString().slice(0, 10);
+            const key      = calDateStr(d);
             const evts     = bookingsByDay.get(key) ?? [];
             const visible  = evts.slice(0, 3);
             const overflow = evts.length - visible.length;
@@ -644,9 +720,10 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
                   {d.getDate()}
                 </div>
                 {renderMonthDraftBlocks(d)}
-                {visible.map(({ booking, isOwn }) => (
-                  <Tooltip key={booking.id}
+                  {visible.map(({ booking, isOwn }) => (
+                  <Tooltip key={`${booking.id}-${key}`}
                     content={<EventPopup booking={booking} isOwn={isOwn}
+                      onEdit={isOwn && onEditBooking ? () => onEditBooking(booking) : undefined}
                       onCancel={isOwn && onCancelBooking ? () => onCancelBooking(booking) : undefined}
                       cancelling={cancellingId === booking.id} />}
                     relationship="description" positioning="below-start" withArrow>
@@ -695,7 +772,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
           {renderTimeGutter()}
           <div className={s.dayColumns}>
             {days.map((d, i) => {
-              const key  = d.toISOString().slice(0, 10);
+              const key  = calDateStr(d);
               const evts = bookingsByDay.get(key) ?? [];
               return (
                 <div
@@ -703,25 +780,41 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
                   ref={el => { colRefs.current[i] = el; }}
                   className={`${s.dayCol} ${interactive ? s.dayColInteractive : ''}`}
                   style={i === 0 ? { borderLeft: 'none' } : {}}
-                  onMouseDown={interactive ? (e) => handleColMouseDown(e, i) : undefined}
+                  data-cal-col={calColDateAttr?.[i] ?? calDateStr(d)}
+                  onMouseDown={interactive && !clickMode ? (e) => handleColMouseDown(e, i) : undefined}
+                  onClick={interactive && clickMode ? (e) => handleColClick(e, i) : undefined}
                 >
                   {renderHourLines()}
                   {renderNowLine(d)}
                   {renderDraftBlocks(d)}
-                  {evts.map(({ booking, isOwn }) => (
-                    <Tooltip key={booking.id}
+                  {evts.map(({ booking, isOwn, dayStart, dayEnd }) => {
+                    // Use per-day clamped times if available, else fall back to booking times
+                    const evtStart = dayStart ?? booking.start_time;
+                    const evtEnd   = dayEnd   ?? booking.end_time;
+                    // Clamp to visible grid window
+                    const toH = (iso: string) => { const d = new Date(iso); return d.getHours() + d.getMinutes() / 60; };
+                    const visStart = Math.max(toH(evtStart), CAL_HOUR_START);
+                    const visEnd   = Math.min(toH(evtEnd),   CAL_HOUR_END);
+                    if (visEnd <= visStart) return null;
+                    const topP    = ((visStart - CAL_HOUR_START) / CAL_HOUR_RANGE) * 100;
+                    const heightP = Math.max(1.5, ((visEnd - visStart) / CAL_HOUR_RANGE) * 100);
+                    const canEdit = isOwn && !!onEditBooking;
+                    return (
+                    <Tooltip key={`${booking.id}-${calDateStr(d)}`}
                       content={<EventPopup booking={booking} isOwn={isOwn}
+                        onEdit={isOwn && onEditBooking ? () => onEditBooking(booking) : undefined}
                         onCancel={isOwn && onCancelBooking ? () => onCancelBooking(booking) : undefined}
                         cancelling={cancellingId === booking.id} />}
                       relationship="description" positioning="below-start" withArrow>
                       <div
                         className={`${s.eventBlock} ${!isOwn ? s.eventBlockOther : ''}`}
                         style={{
-                          top: `${calTopPct(booking.start_time)}%`,
-                          height: `${calHeightPct(booking.start_time, booking.end_time)}%`,
-                          // Don't swallow mousedown events when dragging
+                          top: `${topP}%`,
+                          height: `${heightP}%`,
                           pointerEvents: interactive && dragRef.current.active ? 'none' : 'auto',
+                          cursor: canEdit ? 'pointer' : undefined,
                         }}
+                        onClick={canEdit ? (e) => { e.stopPropagation(); onEditBooking(booking); } : undefined}
                       >
                         <div className={`${s.eventTitle} ${!isOwn ? s.eventTitleOther : ''}`}>{booking.desk.name}</div>
                         <div className={`${s.eventMeta} ${!isOwn ? s.eventMetaOther : ''}`}>
@@ -730,7 +823,8 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
                         {!isOwn && <div className={`${s.eventMeta} ${s.eventMetaOther}`}>{booking.username}</div>}
                       </div>
                     </Tooltip>
-                  ))}
+                    );
+                  })}
                 </div>
               );
             })}
@@ -752,7 +846,7 @@ export const BookingsCalendar: React.FC<BookingsCalendarProps> = ({
   refreshToken, onBookingCancelled,
 }) => {
   const s = useCalStyles();
-  const { authenticatedFetch } = useAuth();
+  const { authenticatedFetch, user } = useAuth();
   const bookingApi = createBookingApi(authenticatedFetch);
 
   const [view, setView]       = useState<ViewMode>('week');
@@ -769,7 +863,7 @@ export const BookingsCalendar: React.FC<BookingsCalendarProps> = ({
     }
     const s = calStartOfWeek(calStartOfMonth(anchor));
     return Array.from({ length: 42 }, (_, i) => calAddDays(s, i));
-  }, [view, anchor.toISOString().slice(0, 10)]);
+  }, [view, calDateStr(anchor)]);
 
   const fetchStart = days[0];
   const fetchEnd   = calAddDays(days[days.length - 1], 1);
@@ -818,15 +912,7 @@ export const BookingsCalendar: React.FC<BookingsCalendarProps> = ({
     return anchor.toLocaleDateString([], { month: 'long', year: 'numeric' });
   }, [view, anchor]);
 
-  const bookingsByDay = useMemo(() => {
-    const map = new Map<string, Array<{ booking: Booking; isOwn: boolean }>>();
-    bookings.forEach(b => {
-      const key = new Date(b.start_time).toISOString().slice(0, 10);
-      if (!map.has(key)) map.set(key, []);
-      map.get(key)!.push({ booking: b, isOwn: true });
-    });
-    return map;
-  }, [bookings]);
+  const bookingsByDay = useMemo(() => expandBookingsByDay(bookings, user?.username), [bookings, user?.username]);
 
   return (
     <div className={s.root}>

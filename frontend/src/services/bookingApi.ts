@@ -84,6 +84,16 @@ export const createBookingApi = (
     return handleResponse<void>(response);
   },
 
+  /** Update an existing booking's time range */
+  async updateBooking(bookingId: number, payload: { start_time: string; end_time: string }): Promise<Booking> {
+    const response = await authenticatedFetch(`${API_BASE_URL}/bookings/${bookingId}/`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    return handleResponse<Booking>(response);
+  },
+
   /** Lock a desk before booking */
   async lockDesk(deskId: number): Promise<{ ok: boolean; locked_by?: string }> {
     const response = await authenticatedFetch(`${API_BASE_URL}/bookings/lock/`, {

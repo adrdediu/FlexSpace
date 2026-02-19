@@ -4,14 +4,7 @@ import {
   tokens,
   Text,
   Button,
-  Spinner,
   Tooltip,
-  Dialog,
-  DialogSurface,
-  DialogBody,
-  DialogTitle,
-  DialogContent,
-  Field,
   Menu,
   MenuPopover,
   MenuList,
@@ -27,24 +20,15 @@ import {
   Checkmark20Filled,
   Star20Filled,
   Dismiss24Regular,
-  Clock20Regular,
   Warning20Regular,
   CalendarAdd20Regular,
   CalendarCancel20Regular,
-  ChevronLeft20Regular,
-  ChevronRight20Regular,
 } from '@fluentui/react-icons';
-import { DatePicker } from '@fluentui/react-datepicker-compat';
-import { TimePicker } from '@fluentui/react-timepicker-compat';
 import { type RoomWithDesks } from '../../services/roomApi';
-import { createBookingApi, type Booking } from '../../services/bookingApi';
+import { createBookingApi } from '../../services/bookingApi';
 import { useAuth } from '../../contexts/AuthContext';
 import websocketService from '../../services/webSocketService';
-import {
-  CalendarGrid, type DraftSlot,
-  calStartOfDay, calStartOfWeek, calAddDays, calStartOfMonth,
-  calFormatShortDate,
-} from './BookingsCalendar';
+import { BookingModal } from './BookingModal';
 
 // ─── Styles ───────────────────────────────────────────────────────────────────
 // Map-related styles copied verbatim from ManageDesksModal to guarantee identical rendering.
@@ -195,161 +179,12 @@ const useStyles = makeStyles({
     textAlign: 'center',
     gap: tokens.spacingVerticalS,
   },
-
-  // ── Booking modal ──
-  bookingModalSurface: {
-    maxWidth: '860px',
-    width: '96vw',
-    maxHeight: '92vh',
-  },
-  // Top row: desk chip + date/time fields + duration + actions all inline
-  bookingTopRow: {
-    display: 'flex',
-    alignItems: 'flex-end',
-    gap: tokens.spacingHorizontalM,
-    paddingBottom: tokens.spacingVerticalM,
-    borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
-    flexWrap: 'wrap',
-  },
-  bookingDeskInfo: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: tokens.spacingHorizontalS,
-    padding: `6px ${tokens.spacingHorizontalM}`,
-    backgroundColor: tokens.colorNeutralBackground2,
-    borderRadius: tokens.borderRadiusMedium,
-    border: `1px solid ${tokens.colorNeutralStroke2}`,
-    flexShrink: 0,
-    alignSelf: 'flex-end',
-    minWidth: 0,
-  },
-  bookingDeskDot: {
-    width: '10px',
-    height: '10px',
-    borderRadius: '50%',
-    flexShrink: 0,
-  },
-  bookingFieldGroup: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '3px',
-    minWidth: '110px',
-  },
-  bookingFieldLabel: {
-    fontSize: tokens.fontSizeBase100,
-    color: tokens.colorNeutralForeground3,
-    fontWeight: tokens.fontWeightSemibold,
-    textTransform: 'uppercase',
-    letterSpacing: '0.05em',
-  },
-  bookingArrow: {
-    alignSelf: 'flex-end',
-    paddingBottom: '9px',
-    color: tokens.colorNeutralForeground3,
-    fontSize: tokens.fontSizeBase400,
-    lineHeight: 1,
-    flexShrink: 0,
-    userSelect: 'none',
-  },
-  tzLabel: {
-    alignSelf: 'flex-end',
-    paddingBottom: '9px',
-    fontSize: tokens.fontSizeBase100,
-    color: tokens.colorNeutralForeground3,
-    whiteSpace: 'nowrap',
-    flexShrink: 0,
-  },
-  durationBadge: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: tokens.spacingHorizontalXS,
-    padding: `5px ${tokens.spacingHorizontalS}`,
-    backgroundColor: tokens.colorBrandBackground2,
-    borderRadius: tokens.borderRadiusMedium,
-    fontSize: tokens.fontSizeBase100,
-    color: tokens.colorBrandForeground1,
-    fontWeight: tokens.fontWeightSemibold,
-    alignSelf: 'flex-end',
-    flexShrink: 0,
-    whiteSpace: 'nowrap',
-  },
-  bookingActions: {
-    display: 'flex',
-    gap: tokens.spacingHorizontalS,
-    alignSelf: 'flex-end',
-    marginLeft: 'auto',
-    flexShrink: 0,
-  },
-  conflictWarning: {
-    display: 'flex',
-    gap: tokens.spacingHorizontalS,
-    alignItems: 'flex-start',
-    padding: tokens.spacingVerticalS,
-    backgroundColor: tokens.colorPaletteRedBackground1,
-    borderRadius: tokens.borderRadiusMedium,
-    border: `1px solid ${tokens.colorPaletteRedBorder1}`,
-    color: tokens.colorPaletteRedForeground1,
-    fontSize: tokens.fontSizeBase200,
-    flexShrink: 0,
-  },
-  // Calendar section fills remaining height
-  bookingCalSection: {
-    display: 'flex',
-    flexDirection: 'column',
-    flex: 1,
-    minHeight: 0,
-    paddingTop: tokens.spacingVerticalXS,
-    overflow: 'hidden',
-  },
-  calViewToolbar: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: tokens.spacingHorizontalXS,
-    paddingBottom: tokens.spacingVerticalXS,
-    flexShrink: 0,
-  },
-  calTitleSmall: {
-    fontSize: tokens.fontSizeBase200,
-    fontWeight: tokens.fontWeightSemibold,
-    flex: 1,
-    textAlign: 'center',
-  },
 });
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function todayStr() {
-  return new Date().toISOString().slice(0, 10);
-}
-
-function toLocalTimeStr(isoDate: string) {
-  try { return new Date(isoDate).toTimeString().slice(0, 5); } catch { return ''; }
-}
-
 function buildISO(date: string, time: string): string {
   return new Date(`${date}T${time}:00`).toISOString();
-}
-
-// Helpers for DatePicker / TimePicker
-function dateStrToDate(str: string): Date {
-  // Parse YYYY-MM-DD as local date
-  const [y, m, d] = str.split('-').map(Number);
-  return new Date(y, m - 1, d);
-}
-
-function dateToDateStr(d: Date): string {
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-}
-
-function timeStrToDate(time: string, base: Date): Date {
-  const [h, m] = time.split(':').map(Number);
-  const d = new Date(base);
-  d.setHours(h, m, 0, 0);
-  return d;
-}
-
-function dateToTimeStr(d: Date): string {
-  return `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`;
 }
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -395,384 +230,16 @@ function markerTitle(desk: DeskLiveState, myUserId?: number): string {
     return `${desk.name} — permanent desk`;
   if (desk.is_booked)
     return desk.booked_by_id === myUserId
-      ? `${desk.name} — your booking`
-      : `${desk.name} — booked by ${desk.booked_by ?? 'someone'}`;
+      ? `${desk.name} — your booking (click to book another slot)`
+      : `${desk.name} — booked now, click to book in advance`;
   return `${desk.name} — available`;
 }
 
 function canBook(desk: DeskLiveState, myUserId?: number): boolean {
   if (desk.is_locked && desk.locked_by_id !== myUserId) return false;
-  if (desk.is_booked && desk.booked_by_id !== myUserId) return false;
   if (desk.is_permanent && desk.permanent_assignee && desk.permanent_assignee !== myUserId) return false;
   return true;
 }
-
-// ─── Booking Modal ────────────────────────────────────────────────────────────
-
-type CalView = 'day' | 'week' | 'month';
-
-// Local timezone abbreviation
-const TZ_LABEL = (() => {
-  try {
-    return new Intl.DateTimeFormat([], { timeZoneName: 'short' })
-      .formatToParts(new Date())
-      .find(p => p.type === 'timeZoneName')?.value ?? '';
-  } catch { return ''; }
-})();
-
-interface BookingModalProps {
-  open: boolean;
-  desk: DeskLiveState | null;
-  roomName: string;
-  onClose: () => void;
-  onConfirm: (startDate: string, endDate: string, startTime: string, endTime: string) => Promise<void>;
-  myUserId?: number;
-  bookingApi: ReturnType<typeof createBookingApi>;
-  onLockFailed?: (lockedBy: string | null) => void;
-}
-
-const BookingModal: React.FC<BookingModalProps> = ({
-  open, desk, roomName, onClose, onConfirm,
-  myUserId, bookingApi, onLockFailed,
-}) => {
-  const styles = useStyles();
-
-  // ── Form state — separate start/end date + time ──
-  const [startDate, setStartDate] = useState(todayStr());
-  const [endDate,   setEndDate]   = useState(todayStr());
-  const [startTime, setStartTime] = useState('09:00');
-  const [endTime,   setEndTime]   = useState('17:00');
-  const [saving, setSaving]       = useState(false);
-  const [error, setError]         = useState<string | null>(null);
-
-  // ── Calendar view state ──
-  const [calView,   setCalView]   = useState<CalView>('week');
-  const [calAnchor, setCalAnchor] = useState<Date>(calStartOfWeek(calStartOfDay(new Date())));
-
-  // ── Desk bookings (all users) for the visible range ──
-  const [deskBookings, setDeskBookings] = useState<Booking[]>([]);
-  const [loadingCal,   setLoadingCal]  = useState(false);
-
-  // ── Lock lifecycle ──
-  const lockRefreshRef  = useRef<ReturnType<typeof setInterval> | null>(null);
-  const lockedDeskIdRef = useRef<number | null>(null);
-
-  useEffect(() => {
-    if (!open || !desk) return;
-    let cancelled = false;
-    bookingApi.lockDesk(desk.id).then(result => {
-      if (cancelled) return;
-      if (result.ok) {
-        lockedDeskIdRef.current = desk.id;
-        lockRefreshRef.current = setInterval(
-          () => bookingApi.refreshLock(desk.id).catch(() => {}), 25_000
-        );
-      } else {
-        onLockFailed?.(result.locked_by ?? null);
-        onClose();
-      }
-    });
-
-    // ── Release lock on page unload (refresh / tab close / navigation) ──
-    // sendBeacon fires synchronously during unload and sends cookies automatically.
-    // React cleanup (return fn below) handles normal unmount; this handles hard exits.
-    const unlockUrl = `${import.meta.env.VITE_API_URL || 'http://localhost:8000/api'}/bookings/unlock/`;
-    const handleUnload = () => {
-      if (lockedDeskIdRef.current === null) return;
-      const payload = JSON.stringify({ desk_id: lockedDeskIdRef.current });
-      const blob = new Blob([payload], { type: 'application/json' });
-      navigator.sendBeacon(unlockUrl, blob);
-    };
-    window.addEventListener('beforeunload', handleUnload);
-
-    return () => {
-      cancelled = true;
-      window.removeEventListener('beforeunload', handleUnload);
-      if (lockRefreshRef.current) { clearInterval(lockRefreshRef.current); lockRefreshRef.current = null; }
-      if (lockedDeskIdRef.current !== null) {
-        bookingApi.unlockDesk(lockedDeskIdRef.current).catch(() => {});
-        lockedDeskIdRef.current = null;
-      }
-    };
-  }, [open, desk?.id]);
-
-  // ── Reset on open ──
-  useEffect(() => {
-    if (open) {
-      const today = todayStr();
-      setStartDate(today); setEndDate(today);
-      setStartTime('09:00'); setEndTime('17:00');
-      setError(null); setCalView('week');
-      setCalAnchor(calStartOfWeek(calStartOfDay(new Date())));
-    }
-  }, [open, desk?.id]);
-
-  // ── Ensure endDate >= startDate ──
-  useEffect(() => {
-    if (endDate < startDate) setEndDate(startDate);
-  }, [startDate]);
-
-  // ── Sync calendar to show startDate when it changes ──
-  useEffect(() => {
-    if (!startDate) return;
-    const d = dateStrToDate(startDate);
-    if (calView === 'day')   setCalAnchor(calStartOfDay(d));
-    if (calView === 'week')  setCalAnchor(calStartOfWeek(d));
-    if (calView === 'month') setCalAnchor(calStartOfMonth(d));
-  }, [startDate, calView]);
-
-  // ── Compute calendar days ──
-  const calDays: Date[] = useMemo(() => {
-    if (calView === 'day')  return [calAnchor];
-    if (calView === 'week') return Array.from({ length: 7 }, (_, i) => calAddDays(calAnchor, i));
-    const gs = calStartOfWeek(calStartOfMonth(calAnchor));
-    return Array.from({ length: 42 }, (_, i) => calAddDays(gs, i));
-  }, [calView, calAnchor.toISOString().slice(0, 10)]);
-
-  // ── Fetch desk bookings for visible range ──
-  useEffect(() => {
-    if (!open || !desk) return;
-    setLoadingCal(true);
-    const start = calDays[0];
-    const end   = calAddDays(calDays[calDays.length - 1], 1);
-    bookingApi.getDeskBookingsRange(desk.id, start.toISOString(), end.toISOString())
-      .then(data => setDeskBookings(data))
-      .catch(() => setDeskBookings([]))
-      .finally(() => setLoadingCal(false));
-  }, [open, desk?.id, calDays[0].toISOString(), calDays[calDays.length - 1].toISOString()]);
-
-  // ── Calendar navigation ──
-  const navigateCal = (dir: -1 | 1) => setCalAnchor(prev => {
-    if (calView === 'day')   return calAddDays(prev, dir);
-    if (calView === 'week')  return calAddDays(prev, dir * 7);
-    return new Date(prev.getFullYear(), prev.getMonth() + dir, 1);
-  });
-
-  const calTitle = useMemo(() => {
-    if (calView === 'day')  return calFormatShortDate(calAnchor);
-    if (calView === 'week') {
-      const s = calAnchor, e = calAddDays(s, 6);
-      return `${s.toLocaleDateString([], { month: 'short', day: 'numeric' })} – ${e.toLocaleDateString([], { month: 'short', day: 'numeric', year: 'numeric' })}`;
-    }
-    return calAnchor.toLocaleDateString([], { month: 'long', year: 'numeric' });
-  }, [calView, calAnchor]);
-
-  // ── bookingsByDay map ──
-  const bookingsByDay = useMemo(() => {
-    const map = new Map<string, Array<{ booking: Booking; isOwn: boolean }>>();
-    deskBookings.forEach(b => {
-      const key = new Date(b.start_time).toISOString().slice(0, 10);
-      if (!map.has(key)) map.set(key, []);
-      map.get(key)!.push({ booking: b, isOwn: b.user === myUserId });
-    });
-    return map;
-  }, [deskBookings, myUserId]);
-
-  // ── Draft slots — span multiple days if needed ──
-  const drafts: DraftSlot[] = useMemo(() => {
-    if (!startDate || !endDate || !startTime || !endTime) return [];
-    if (startDate === endDate) {
-      if (startTime >= endTime) return [];
-      return [{ date: startDate, start: startTime, end: endTime, label: desk?.name ?? 'Desk' }];
-    }
-    // Multi-day: first day goes to midnight, last day from midnight, middle days all-day
-    const result: DraftSlot[] = [];
-    let cur = startDate;
-    while (cur <= endDate) {
-      const isFirst = cur === startDate;
-      const isLast  = cur === endDate;
-      result.push({
-        date:  cur,
-        start: isFirst ? startTime : '00:00',
-        end:   isLast  ? endTime   : '23:59',
-        label: desk?.name ?? 'Desk',
-      });
-      // advance one day
-      const next = calAddDays(dateStrToDate(cur), 1);
-      cur = dateToDateStr(next);
-    }
-    return result;
-  }, [startDate, endDate, startTime, endTime, desk?.name]);
-
-  // ── Duration label ──
-  const durationLabel = useMemo(() => {
-    if (!startDate || !endDate || !startTime || !endTime) return null;
-    const start = new Date(`${startDate}T${startTime}:00`);
-    const end   = new Date(`${endDate}T${endTime}:00`);
-    const mins  = (end.getTime() - start.getTime()) / 60_000;
-    if (mins <= 0) return null;
-    const days = Math.floor(mins / 1440);
-    const h    = Math.floor((mins % 1440) / 60);
-    const m    = mins % 60;
-    const parts = [];
-    if (days > 0) parts.push(`${days}d`);
-    if (h > 0)    parts.push(`${h}h`);
-    if (m > 0)    parts.push(`${m}min`);
-    return parts.join(' ');
-  }, [startDate, endDate, startTime, endTime]);
-
-  // ── Validation ──
-  const isValid = useMemo(() => {
-    if (!startDate || !endDate || !startTime || !endTime) return false;
-    const start = new Date(`${startDate}T${startTime}:00`);
-    const end   = new Date(`${endDate}T${endTime}:00`);
-    return end > start;
-  }, [startDate, endDate, startTime, endTime]);
-
-  // ── Confirm ──
-  const handleConfirm = async () => {
-    if (!desk || !isValid) return;
-    setSaving(true); setError(null);
-    try { await onConfirm(startDate, endDate, startTime, endTime); }
-    catch (err: any) { setError(err.message || 'Failed to book desk.'); }
-    finally { setSaving(false); }
-  };
-
-  const isMyDesk = desk?.booked_by_id === myUserId;
-  if (!desk) return null;
-
-  return (
-    <Dialog open={open} onOpenChange={(_, d) => !d.open && !saving && onClose()}>
-      <DialogSurface className={styles.bookingModalSurface}>
-        <DialogBody style={{ display: 'flex', flexDirection: 'column', height: '100%' }}>
-          <DialogTitle
-            action={<Button appearance="subtle" icon={<Dismiss24Regular />} onClick={onClose} disabled={saving} />}
-          >
-            {isMyDesk ? `Your Booking — ${desk.name}` : `Book ${desk.name}`}
-          </DialogTitle>
-
-          <DialogContent style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
-
-            {/* ── Top row: desk info + date/time fields + actions ── */}
-            <div className={styles.bookingTopRow}>
-
-              {/* Desk chip */}
-              <div className={styles.bookingDeskInfo}>
-                <div className={styles.bookingDeskDot}
-                  style={{ backgroundColor: isMyDesk ? '#3b82f6' : '#22c55e' }} />
-                <div style={{ minWidth: 0 }}>
-                  <Text weight="semibold" size={300} block style={{ whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                    {desk.name}
-                  </Text>
-                  <Text size={100} block style={{ color: tokens.colorNeutralForeground3, whiteSpace: 'nowrap' }}>
-                    {roomName}
-                  </Text>
-                </div>
-              </div>
-
-              {/* Start date */}
-              <div className={styles.bookingFieldGroup}>
-                <div className={styles.bookingFieldLabel}>Start date</div>
-                <DatePicker
-                  value={dateStrToDate(startDate)}
-                  onSelectDate={d => d && setStartDate(dateToDateStr(d))}
-                  minDate={dateStrToDate(todayStr())}
-                  disabled={saving}
-                  style={{ width: '130px' }}
-                />
-              </div>
-
-              {/* Start time */}
-              <div className={styles.bookingFieldGroup}>
-                <div className={styles.bookingFieldLabel}>Start time</div>
-                <TimePicker
-                  value={timeStrToDate(startTime, dateStrToDate(startDate))}
-                  onTimeChange={(_, d) => d.selectedTime && setStartTime(dateToTimeStr(d.selectedTime))}
-                  increment={30} disabled={saving} style={{ width: '110px' }}
-                />
-              </div>
-
-              {/* Arrow separator */}
-              <div className={styles.bookingArrow}>→</div>
-
-              {/* End date */}
-              <div className={styles.bookingFieldGroup}>
-                <div className={styles.bookingFieldLabel}>End date</div>
-                <DatePicker
-                  value={dateStrToDate(endDate)}
-                  onSelectDate={d => d && setEndDate(dateToDateStr(d))}
-                  minDate={dateStrToDate(startDate)}
-                  disabled={saving}
-                  style={{ width: '130px' }}
-                />
-              </div>
-
-              {/* End time */}
-              <div className={styles.bookingFieldGroup}>
-                <div className={styles.bookingFieldLabel}>End time</div>
-                <TimePicker
-                  value={timeStrToDate(endTime, dateStrToDate(endDate))}
-                  onTimeChange={(_, d) => d.selectedTime && setEndTime(dateToTimeStr(d.selectedTime))}
-                  increment={30} disabled={saving} style={{ width: '110px' }}
-                />
-              </div>
-
-              {/* Timezone */}
-              {TZ_LABEL && <div className={styles.tzLabel}>{TZ_LABEL}</div>}
-
-              {/* Duration badge */}
-              {durationLabel && (
-                <div className={styles.durationBadge}>
-                  <Clock20Regular style={{ fontSize: '12px' }} />
-                  {durationLabel}
-                </div>
-              )}
-
-              {/* Error inline */}
-              {error && (
-                <div className={styles.conflictWarning}>
-                  <Warning20Regular style={{ flexShrink: 0, fontSize: '14px' }} />
-                  <span>{error}</span>
-                </div>
-              )}
-
-              {/* Actions pushed right */}
-              <div className={styles.bookingActions}>
-                <Button appearance="secondary" onClick={onClose} disabled={saving}>Cancel</Button>
-                <Button appearance="primary" onClick={handleConfirm} disabled={saving || !isValid}>
-                  {saving ? <Spinner size="tiny" /> : 'Confirm'}
-                </Button>
-              </div>
-            </div>
-
-            {/* ── Calendar fills remaining height ── */}
-            <div className={styles.bookingCalSection}>
-
-              {/* Cal toolbar */}
-              <div className={styles.calViewToolbar}>
-                <Button size="small" appearance="subtle" icon={<ChevronLeft20Regular />} onClick={() => navigateCal(-1)} />
-                <Button size="small" appearance="subtle" icon={<ChevronRight20Regular />} onClick={() => navigateCal(1)} />
-                <Text className={styles.calTitleSmall}>{calTitle}</Text>
-                {(['day', 'week', 'month'] as CalView[]).map(v => (
-                  <Button key={v} size="small" appearance={calView === v ? 'primary' : 'subtle'}
-                    onClick={() => setCalView(v)}
-                  >
-                    {v.charAt(0).toUpperCase() + v.slice(1)}
-                  </Button>
-                ))}
-              </div>
-
-              {loadingCal ? (
-                <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                  <Spinner size="small" />
-                </div>
-              ) : (
-                <CalendarGrid
-                  view={calView}
-                  anchor={calAnchor}
-                  days={calView !== 'month' ? calDays : []}
-                  bookingsByDay={bookingsByDay}
-                  drafts={drafts}
-                />
-              )}
-            </div>
-
-          </DialogContent>
-        </DialogBody>
-      </DialogSurface>
-    </Dialog>
-  );
-};
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
@@ -806,6 +273,7 @@ export const RoomMapViewer: React.FC<RoomMapViewerProps> = ({ room, onClose, onB
   // ── Booking ──
   const [bookingModalOpen, setBookingModalOpen] = useState(false);
   const [bookingDesk, setBookingDesk] = useState<DeskLiveState | null>(null);
+  const [editingBooking, setEditingBooking] = useState<import('../../services/bookingApi').Booking | null>(null);
   const openingBookingRef = useRef(false);
 
   // ── Init desks from room prop ──
@@ -1008,6 +476,17 @@ export const RoomMapViewer: React.FC<RoomMapViewerProps> = ({ room, onClose, onB
   // ── "Book Desk" menu item → snapshot desk, open modal immediately ──
   const handleBookDesk = (desk: DeskLiveState) => {
     openingBookingRef.current = true;
+    setEditingBooking(null);
+    setBookingDesk(desk);
+    setBookingModalOpen(true);
+  };
+
+  // ── Edit an existing booking from the calendar ──
+  const handleEditBooking = (booking: import('../../services/bookingApi').Booking) => {
+    const desk = desks.find(d => d.id === booking.desk.id);
+    if (!desk) return;
+    openingBookingRef.current = true;
+    setEditingBooking(booking);
     setBookingDesk(desk);
     setBookingModalOpen(true);
   };
@@ -1026,6 +505,7 @@ export const RoomMapViewer: React.FC<RoomMapViewerProps> = ({ room, onClose, onB
   const handleCloseBookingModal = useCallback(() => {
     setBookingModalOpen(false);
     setBookingDesk(null);
+    setEditingBooking(null);
     setSelectedDeskId(null);
   }, []);
 
@@ -1193,8 +673,11 @@ export const RoomMapViewer: React.FC<RoomMapViewerProps> = ({ room, onClose, onB
                                 icon={<CalendarAdd20Regular />}
                                 onClick={() => handleBookDesk(desk)}
                               >
-                                {desk.is_booked && desk.booked_by_id === myUserId
-                                  ? 'Manage Booking' : 'Book Desk'}
+                                {desk.is_booked
+                                  ? desk.booked_by_id === myUserId
+                                    ? 'Book Another Slot'
+                                    : `Book in Advance`
+                                  : 'Book Desk'}
                               </MenuItem>
                             ) : (
                               <MenuItem icon={<CalendarCancel20Regular />} disabled>
@@ -1219,12 +702,15 @@ export const RoomMapViewer: React.FC<RoomMapViewerProps> = ({ room, onClose, onB
       {/* Booking modal */}
       <BookingModal
         open={bookingModalOpen}
-        desk={bookingDesk}
+        desk={bookingDesk ? { id: bookingDesk.id, name: bookingDesk.name, color: '#22c55e' } : null}
         roomName={room.name}
         onClose={handleCloseBookingModal}
         onConfirm={handleConfirmBooking}
-        myUserId={myUserId}
+        myUsername={user?.username}
         bookingApi={bookingApi}
+        editingBooking={editingBooking}
+        onBookingUpdated={() => { handleCloseBookingModal(); onBookingChange?.(); }}
+        onEditBooking={handleEditBooking}
         onLockFailed={(lockedBy) => {
           if (bookingDesk !== null) {
             setDesks(prev => prev.map(d =>
