@@ -59,6 +59,13 @@ export const createBookingApi = (
     return handleResponse<Booking[]>(response);
   },
 
+  /** Get all bookings for a specific desk across a date range (all users) */
+  async getDeskBookingsRange(deskId: number, start: string, end: string): Promise<Booking[]> {
+    const qs = new URLSearchParams({ desk: String(deskId), start, end });
+    const response = await authenticatedFetch(`${API_BASE_URL}/bookings/?${qs}`);
+    return handleResponse<Booking[]>(response);
+  },
+
   /** Create a single booking */
   async createBooking(payload: CreateBookingPayload): Promise<Booking> {
     const response = await authenticatedFetch(`${API_BASE_URL}/bookings/`, {

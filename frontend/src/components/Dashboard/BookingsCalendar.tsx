@@ -1,0 +1,875 @@
+import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import {
+  makeStyles, tokens, Text, Button, Spinner, Tooltip,
+} from '@fluentui/react-components';
+import {
+  ChevronLeft20Regular, ChevronRight20Regular,
+  Delete20Regular, Clock20Regular, DoorRegular, BuildingRegular,
+  CalendarLtr20Regular, CalendarDay20Regular,
+  CalendarWeekNumbers20Regular, CalendarMonth20Regular,
+} from '@fluentui/react-icons';
+import { createBookingApi, type Booking } from '../../services/bookingApi';
+import { useAuth } from '../../contexts/AuthContext';
+
+// ─── View modes ───────────────────────────────────────────────────────────────
+type ViewMode = 'day' | 'week' | 'month';
+
+// ─── Shared calendar helpers ──────────────────────────────────────────────────
+export function calStartOfDay(d: Date): Date {
+  return new Date(d.getFullYear(), d.getMonth(), d.getDate());
+}
+export function calStartOfWeek(d: Date): Date {
+  const dow = d.getDay();
+  const mon = new Date(d);
+  mon.setDate(d.getDate() - ((dow + 6) % 7));
+  return calStartOfDay(mon);
+}
+export function calStartOfMonth(d: Date): Date {
+  return new Date(d.getFullYear(), d.getMonth(), 1);
+}
+export function calAddDays(d: Date, n: number): Date {
+  const r = new Date(d); r.setDate(r.getDate() + n); return r;
+}
+export function calIsSameDay(a: Date, b: Date): boolean {
+  return a.getFullYear() === b.getFullYear() &&
+         a.getMonth()    === b.getMonth()    &&
+         a.getDate()     === b.getDate();
+}
+export function calIsToday(d: Date): boolean { return calIsSameDay(d, new Date()); }
+export function calFormatTime(iso: string): string {
+  try { return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }
+  catch { return ''; }
+}
+export function calFormatShortDate(d: Date): string {
+  return d.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
+export const CAL_HOUR_START = 7;
+export const CAL_HOUR_END   = 21;
+export const CAL_HOUR_RANGE = CAL_HOUR_END - CAL_HOUR_START;
+export const CAL_CELL_H     = 56; // px per hour
+
+export function calTopPct(iso: string): number {
+  const d = new Date(iso);
+  const h = d.getHours() + d.getMinutes() / 60;
+  return Math.max(0, Math.min(100, ((h - CAL_HOUR_START) / CAL_HOUR_RANGE) * 100));
+}
+export function calHeightPct(s: string, e: string): number {
+  const diffH = (new Date(e).getTime() - new Date(s).getTime()) / 3_600_000;
+  return Math.max(1.5, (diffH / CAL_HOUR_RANGE) * 100);
+}
+
+const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+const HOURS    = Array.from({ length: CAL_HOUR_RANGE + 1 }, (_, i) => CAL_HOUR_START + i);
+
+// ── Snap helpers ──────────────────────────────────────────────────────────────
+function snapHour(h: number): number { return Math.round(h * 2) / 2; }
+
+function hourToTimeStr(h: number): string {
+  const clamped = Math.max(CAL_HOUR_START, Math.min(CAL_HOUR_END, snapHour(h)));
+  const hh = Math.floor(clamped);
+  const mm  = clamped % 1 === 0.5 ? 30 : 0;
+  return `${String(hh).padStart(2,'0')}:${String(mm).padStart(2,'0')}`;
+}
+
+function pxToHour(y: number, colHeight: number): number {
+  const pct = Math.max(0, Math.min(1, y / colHeight));
+  return CAL_HOUR_START + pct * CAL_HOUR_RANGE;
+}
+
+// ─── Styles ───────────────────────────────────────────────────────────────────
+export const useCalStyles = makeStyles({
+  root: {
+    display: 'flex', flexDirection: 'column', height: '100%',
+    overflow: 'hidden', gap: tokens.spacingVerticalS,
+  },
+  toolbar: {
+    display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+    gap: tokens.spacingHorizontalM, flexShrink: 0, flexWrap: 'wrap',
+  },
+  toolbarLeft:  { display: 'flex', alignItems: 'center', gap: tokens.spacingHorizontalXS },
+  toolbarRight: { display: 'flex', alignItems: 'center', gap: tokens.spacingHorizontalXS },
+  titleText: {
+    fontSize: tokens.fontSizeBase300, fontWeight: tokens.fontWeightSemibold,
+    minWidth: '148px', textAlign: 'center',
+  },
+  body: { flex: 1, overflowY: 'auto', overflowX: 'hidden' },
+
+  // ── Column headers ──
+  colHeaderRow: {
+    display: 'grid', gridTemplateColumns: '52px 1fr',
+    flexShrink: 0, borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
+  },
+  colHeader: { display: 'flex', flex: 1, borderLeft: `1px solid ${tokens.colorNeutralStroke2}` },
+  colHeaderCell: {
+    flex: 1, padding: `${tokens.spacingVerticalXS} 4px`,
+    textAlign: 'center', fontSize: tokens.fontSizeBase200,
+    color: tokens.colorNeutralForeground2, fontWeight: tokens.fontWeightSemibold,
+  },
+  colHeaderToday: { color: tokens.colorBrandForeground1 },
+  todayCircle: {
+    display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+    width: '24px', height: '24px', borderRadius: '50%',
+    backgroundColor: tokens.colorBrandBackground,
+    color: tokens.colorNeutralForegroundOnBrand,
+    fontSize: tokens.fontSizeBase300, fontWeight: tokens.fontWeightBold,
+  },
+
+  // ── Time grid ──
+  timeGrid: {
+    display: 'grid', gridTemplateColumns: '52px 1fr',
+    minHeight: `${CAL_HOUR_RANGE * CAL_CELL_H}px`,
+  },
+  timeGutter: { display: 'flex', flexDirection: 'column' },
+  timeLabel: {
+    height: `${CAL_CELL_H}px`, display: 'flex', alignItems: 'flex-start',
+    paddingTop: '2px', paddingRight: '6px',
+    fontSize: tokens.fontSizeBase100, color: tokens.colorNeutralForeground3,
+    textAlign: 'right', justifyContent: 'flex-end', boxSizing: 'border-box',
+  },
+  dayColumns: { display: 'flex', flex: 1, position: 'relative' },
+  dayCol: { flex: 1, position: 'relative', borderLeft: `1px solid ${tokens.colorNeutralStroke2}` },
+  dayColInteractive: { cursor: 'crosshair' },
+  hourLine: {
+    position: 'absolute', left: 0, right: 0, height: '1px',
+    backgroundColor: tokens.colorNeutralStroke2, pointerEvents: 'none',
+  },
+  halfHourLine: {
+    position: 'absolute', left: 0, right: 0, height: '1px',
+    backgroundColor: tokens.colorNeutralStroke1, pointerEvents: 'none', opacity: 0.5,
+  },
+
+  // ── Events ──
+  eventBlock: {
+    position: 'absolute', left: '3px', right: '3px',
+    borderRadius: tokens.borderRadiusSmall, padding: '2px 5px',
+    overflow: 'hidden', cursor: 'pointer',
+    backgroundColor: tokens.colorBrandBackground2,
+    borderLeft: `3px solid ${tokens.colorBrandStroke1}`,
+    boxSizing: 'border-box', minHeight: '18px',
+    transition: 'filter 0.1s',
+    ':hover': { filter: 'brightness(0.9)' },
+  },
+  eventBlockOther: {
+    backgroundColor: tokens.colorPaletteRedBackground2,
+    borderLeft: `3px solid ${tokens.colorPaletteRedBorder1}`,
+  },
+  eventBlockDraft: {
+    backgroundColor: tokens.colorPaletteTealBackground2,
+    borderLeft: `3px solid ${tokens.colorPaletteTealBorderActive}`,
+    border: `2px dashed ${tokens.colorPaletteLightTealBorderActive}`,
+    opacity: 0.85, cursor: 'default',
+    transition: 'none',
+  },
+  eventTitle:      { fontSize: '11px', fontWeight: tokens.fontWeightSemibold, color: tokens.colorBrandForeground1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: '1.3' },
+  eventTitleOther: { color: tokens.colorPaletteRedForeground1 },
+  eventTitleDraft: { color: tokens.colorPaletteTealForeground2 },
+  eventMeta:       { fontSize: '10px', color: tokens.colorBrandForeground2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: '1.3' },
+  eventMetaOther:  { color: tokens.colorPaletteRedForeground3 },
+  nowLine: {
+    position: 'absolute', left: 0, right: 0, height: '2px',
+    backgroundColor: tokens.colorPaletteRedForeground1, zIndex: 10, pointerEvents: 'none',
+  },
+  nowDot: {
+    position: 'absolute', left: '-5px', top: '-4px',
+    width: '10px', height: '10px', borderRadius: '50%',
+    backgroundColor: tokens.colorPaletteRedForeground1,
+  },
+
+  // ── Time tooltip while dragging ──
+  dragTooltip: {
+    position: 'absolute', left: '50%', transform: 'translateX(-50%)',
+    backgroundColor: tokens.colorNeutralBackground1,
+    border: `1px solid ${tokens.colorNeutralStroke1}`,
+    borderRadius: tokens.borderRadiusSmall,
+    padding: '2px 6px', fontSize: tokens.fontSizeBase100,
+    fontWeight: tokens.fontWeightSemibold,
+    color: tokens.colorNeutralForeground1,
+    pointerEvents: 'none', zIndex: 20,
+    whiteSpace: 'nowrap', boxShadow: tokens.shadow4,
+  },
+
+  // ── Month ──
+  monthGrid: {
+    display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)',
+    borderTop: `1px solid ${tokens.colorNeutralStroke2}`,
+    borderLeft: `1px solid ${tokens.colorNeutralStroke2}`,
+  },
+  monthDayHeader: {
+    padding: '4px 6px', fontSize: tokens.fontSizeBase100,
+    fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForeground3,
+    textAlign: 'center', borderRight: `1px solid ${tokens.colorNeutralStroke2}`,
+    borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
+    textTransform: 'uppercase', letterSpacing: '0.05em',
+  },
+  monthCell: {
+    minHeight: '88px', borderRight: `1px solid ${tokens.colorNeutralStroke2}`,
+    borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
+    padding: '4px 5px', display: 'flex', flexDirection: 'column', gap: '2px',
+  },
+  monthCellInteractive: {
+    cursor: 'pointer',
+    ':hover': { backgroundColor: tokens.colorNeutralBackground3 },
+  },
+  monthCellOtherMonth: { backgroundColor: tokens.colorNeutralBackground2 },
+  monthCellToday:      { backgroundColor: tokens.colorBrandBackground2 },
+  monthCellPending: {
+    backgroundColor: tokens.colorPaletteTealBackground2,
+    outline: `2px solid ${tokens.colorPaletteTealBorderActive}`,
+    outlineOffset: '-2px',
+  },
+  monthCellInRange: { backgroundColor: tokens.colorPaletteTealBackground2 },
+  monthDayNum: {
+    fontSize: tokens.fontSizeBase200, fontWeight: tokens.fontWeightSemibold,
+    color: tokens.colorNeutralForeground2, marginBottom: '2px',
+    width: '22px', height: '22px',
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    borderRadius: '50%', flexShrink: 0,
+  },
+  monthDayNumToday: {
+    backgroundColor: tokens.colorBrandBackground,
+    color: tokens.colorNeutralForegroundOnBrand,
+  },
+  monthEvent: {
+    fontSize: '10px', padding: '1px 4px', borderRadius: '3px',
+    backgroundColor: tokens.colorBrandBackground2, color: tokens.colorBrandForeground1,
+    borderLeft: `2px solid ${tokens.colorBrandStroke1}`,
+    whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
+    cursor: 'pointer', ':hover': { filter: 'brightness(0.92)' },
+  },
+  monthEventOther: {
+    backgroundColor: tokens.colorPaletteRedBackground2,
+    color: tokens.colorPaletteRedForeground1,
+    borderLeft: `2px solid ${tokens.colorPaletteRedBorder1}`,
+  },
+  monthEventDraft: {
+    backgroundColor: tokens.colorPaletteTealBackground2,
+    color: tokens.colorPaletteTealForeground2,
+    borderLeft: `2px dashed ${tokens.colorPaletteTealBorderActive}`,
+  },
+  monthMore: { fontSize: '10px', color: tokens.colorNeutralForeground3, paddingLeft: '4px' },
+  monthHint: {
+    fontSize: tokens.fontSizeBase100, color: tokens.colorNeutralForeground3,
+    textAlign: 'center', padding: `${tokens.spacingVerticalXS} 0`,
+    flexShrink: 0, fontStyle: 'italic',
+  },
+
+  // ── Popup ──
+  eventPopup: {
+    display: 'flex', flexDirection: 'column', gap: '4px',
+    padding: tokens.spacingVerticalS, minWidth: '190px',
+  },
+  popupTitle: { fontWeight: tokens.fontWeightSemibold, fontSize: tokens.fontSizeBase300 },
+  popupRow: {
+    display: 'flex', alignItems: 'center', gap: tokens.spacingHorizontalXS,
+    fontSize: tokens.fontSizeBase200, color: tokens.colorNeutralForeground2,
+  },
+
+  // ── Empty / loading ──
+  empty: {
+    flex: 1, display: 'flex', flexDirection: 'column',
+    alignItems: 'center', justifyContent: 'center',
+    color: tokens.colorNeutralForeground3, gap: tokens.spacingVerticalS,
+    textAlign: 'center', padding: tokens.spacingVerticalXL, minHeight: '160px',
+  },
+  loadingWrap: {
+    flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '160px',
+  },
+});
+
+// ─── EventPopup ───────────────────────────────────────────────────────────────
+
+const EventPopup: React.FC<{
+  booking: Booking; isOwn: boolean;
+  onCancel?: () => void; cancelling: boolean;
+}> = ({ booking, isOwn, onCancel, cancelling }) => {
+  const s = useCalStyles();
+  return (
+    <div className={s.eventPopup}>
+      <div className={s.popupTitle}>{booking.desk.name}</div>
+      <div className={s.popupRow}>
+        <Clock20Regular style={{ fontSize: '13px', flexShrink: 0 }} />
+        {calFormatTime(booking.start_time)} – {calFormatTime(booking.end_time)}
+      </div>
+      <div className={s.popupRow}>
+        <DoorRegular style={{ fontSize: '13px', flexShrink: 0 }} />
+        {booking.room_name}
+      </div>
+      <div className={s.popupRow}>
+        <BuildingRegular style={{ fontSize: '13px', flexShrink: 0 }} />
+        {booking.location_name}
+      </div>
+      {!isOwn && (
+        <div className={s.popupRow} style={{ color: tokens.colorPaletteRedForeground1, fontSize: '10px' }}>
+          Booked by {booking.username}
+        </div>
+      )}
+      {isOwn && onCancel && (
+        <Button
+          appearance="subtle" size="small"
+          icon={cancelling ? <Spinner size="tiny" /> : <Delete20Regular />}
+          onClick={onCancel} disabled={cancelling}
+          style={{ marginTop: '4px', color: tokens.colorPaletteRedForeground1 }}
+        >
+          Cancel booking
+        </Button>
+      )}
+    </div>
+  );
+};
+
+// ─── CalendarGrid ─────────────────────────────────────────────────────────────
+
+export interface DraftSlot {
+  date: string;   // YYYY-MM-DD
+  start: string;  // HH:MM
+  end: string;    // HH:MM
+  label: string;
+}
+
+export interface CalendarInteraction {
+  startDate: string; endDate: string;
+  startTime: string; endTime: string;
+}
+
+export interface CalendarGridProps {
+  view: ViewMode;
+  anchor: Date;
+  days: Date[];
+  bookingsByDay: Map<string, Array<{ booking: Booking; isOwn: boolean }>>;
+  drafts?: DraftSlot[];
+  interactive?: boolean;
+  onInteract?: (sel: CalendarInteraction) => void;
+  onCancelBooking?: (b: Booking) => void;
+  cancellingId?: number | null;
+}
+
+// Internal drag state (lives in a ref — no re-renders during drag)
+interface DragState {
+  active: boolean;
+  startColIdx: number;   // which day column drag started in
+  startHour: number;     // raw snapped hour at mousedown
+  curColIdx: number;
+  curHour: number;
+}
+
+export const CalendarGrid: React.FC<CalendarGridProps> = ({
+  view, anchor, days, bookingsByDay,
+  drafts = [], interactive = false, onInteract,
+  onCancelBooking, cancellingId,
+}) => {
+  const s = useCalStyles();
+  const [now, setNow] = useState(new Date());
+
+  // ── Live preview of the in-progress drag (rendered via React state) ──
+  const [liveDrafts, setLiveDrafts] = useState<DraftSlot[]>([]);
+
+  // ── Month: pending first-click date + hover preview ──
+  const [pendingDate, setPendingDate] = useState<string | null>(null);
+  const [hoverDate,   setHoverDate]   = useState<string | null>(null);
+
+  // ── Drag refs — no setState on every mousemove ──
+  const dragRef  = useRef<DragState>({ active: false, startColIdx: 0, startHour: 0, curColIdx: 0, curHour: 0 });
+  const colRefs  = useRef<(HTMLDivElement | null)[]>([]);
+
+  useEffect(() => {
+    const t = setInterval(() => setNow(new Date()), 60_000);
+    return () => clearInterval(t);
+  }, []);
+
+  // Clear live drafts when view changes or interactive is toggled off
+  useEffect(() => { setLiveDrafts([]); setPendingDate(null); setHoverDate(null); }, [view, interactive]);
+
+  // ── Pixel → column index ──
+  const getColIdxFromX = useCallback((clientX: number): number => {
+    for (let i = 0; i < colRefs.current.length; i++) {
+      const el = colRefs.current[i];
+      if (!el) continue;
+      const r = el.getBoundingClientRect();
+      if (clientX >= r.left && clientX < r.right) return i;
+    }
+    // Clamp to edges
+    const first = colRefs.current[0]?.getBoundingClientRect();
+    const last  = colRefs.current[colRefs.current.length - 1]?.getBoundingClientRect();
+    if (first && clientX < first.left) return 0;
+    if (last  && clientX > last.right) return colRefs.current.length - 1;
+    return 0;
+  }, []);
+
+  const getHourFromY = useCallback((clientY: number, colIdx: number): number => {
+    const el = colRefs.current[colIdx];
+    if (!el) return CAL_HOUR_START;
+    const r = el.getBoundingClientRect();
+    return pxToHour(clientY - r.top, r.height);
+  }, []);
+
+  // ── Build DraftSlot[] from drag state ──
+  const buildDraftSlots = useCallback((
+    startColIdx: number, startHour: number,
+    curColIdx: number,   curHour: number
+  ): DraftSlot[] => {
+    // Normalise direction
+    let fromCol = startColIdx, toCol = curColIdx;
+    let fromHour = startHour,  toHour = curHour;
+
+    // Same column — if dragging up, swap times (min 30 min)
+    if (fromCol === toCol) {
+      if (fromHour > toHour) [fromHour, toHour] = [toHour, fromHour];
+      if (toHour - fromHour < 0.5) toHour = fromHour + 0.5;
+      const date = days[fromCol]?.toISOString().slice(0, 10);
+      if (!date) return [];
+      return [{ date, start: hourToTimeStr(fromHour), end: hourToTimeStr(toHour), label: '' }];
+    }
+
+    // Multi-column — ensure left→right order
+    if (fromCol > toCol) {
+      [fromCol, toCol] = [toCol, fromCol];
+      [fromHour, toHour] = [toHour, fromHour];
+    }
+
+    const result: DraftSlot[] = [];
+    for (let ci = fromCol; ci <= toCol; ci++) {
+      const date = days[ci]?.toISOString().slice(0, 10);
+      if (!date) continue;
+      const isFirst = ci === fromCol;
+      const isLast  = ci === toCol;
+      result.push({
+        date,
+        start: isFirst ? hourToTimeStr(fromHour) : '00:00',
+        end:   isLast  ? hourToTimeStr(toHour)   : '23:30',
+        label: '',
+      });
+    }
+    return result;
+  }, [days]);
+
+  // ── Mouse handlers ──
+  const handleColMouseDown = useCallback((e: React.MouseEvent, colIdx: number) => {
+    if (!interactive || e.button !== 0) return;
+    e.preventDefault();
+
+    const hour = snapHour(getHourFromY(e.clientY, colIdx));
+    dragRef.current = { active: true, startColIdx: colIdx, startHour: hour, curColIdx: colIdx, curHour: hour + 0.5 };
+
+    const slots = buildDraftSlots(colIdx, hour, colIdx, hour + 0.5);
+    setLiveDrafts(slots);
+
+    const onMove = (ev: MouseEvent) => {
+      if (!dragRef.current.active) return;
+      const ci   = getColIdxFromX(ev.clientX);
+      const hour = snapHour(getHourFromY(ev.clientY, ci));
+      dragRef.current.curColIdx = ci;
+      dragRef.current.curHour   = hour;
+      setLiveDrafts(buildDraftSlots(
+        dragRef.current.startColIdx, dragRef.current.startHour, ci, hour
+      ));
+    };
+
+    const onUp = (ev: MouseEvent) => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup',   onUp);
+      if (!dragRef.current.active) return;
+      dragRef.current.active = false;
+
+      const dr = dragRef.current;
+      const ci  = getColIdxFromX(ev.clientX);
+      const endH = snapHour(getHourFromY(ev.clientY, ci));
+      const slots = buildDraftSlots(dr.startColIdx, dr.startHour, ci, endH);
+
+      if (slots.length === 0 || !onInteract) { setLiveDrafts([]); return; }
+
+      // Compute canonical start/end from built slots
+      const first = slots[0];
+      const last  = slots[slots.length - 1];
+
+      // If single-column drag ended up with same start/end snap, ensure 30 min
+      let st = first.start, et = last.end;
+      if (first.date === last.date && st >= et) et = hourToTimeStr(snapHour(getHourFromY(ev.clientY, ci)) + 0.5);
+
+      onInteract({ startDate: first.date, endDate: last.date, startTime: st, endTime: et });
+      setLiveDrafts(slots);
+    };
+
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup',   onUp);
+  }, [interactive, getColIdxFromX, getHourFromY, buildDraftSlots, onInteract]);
+
+  // ── Month click-click ──
+  const handleMonthCellClick = useCallback((dateKey: string) => {
+    if (!interactive || !onInteract) return;
+    if (!pendingDate) {
+      // First click — set pending
+      setPendingDate(dateKey);
+    } else {
+      // Second click — commit range (always min→max)
+      const [d1, d2] = pendingDate <= dateKey
+        ? [pendingDate, dateKey]
+        : [dateKey, pendingDate];
+      setPendingDate(null);
+      setHoverDate(null);
+      onInteract({ startDate: d1, endDate: d2, startTime: '09:00', endTime: '17:00' });
+    }
+  }, [interactive, pendingDate, onInteract]);
+
+  // ── Now line ──
+  const nowTopPct = Math.max(0, Math.min(100,
+    ((now.getHours() + now.getMinutes() / 60 - CAL_HOUR_START) / CAL_HOUR_RANGE) * 100
+  ));
+
+  const renderHourLines = () =>
+    HOURS.map((h, i) => (
+      <React.Fragment key={h}>
+        <div className={s.hourLine} style={{ top: `${(i / CAL_HOUR_RANGE) * 100}%` }} />
+        {i < CAL_HOUR_RANGE && (
+          <div className={s.halfHourLine} style={{ top: `${((i + 0.5) / CAL_HOUR_RANGE) * 100}%` }} />
+        )}
+      </React.Fragment>
+    ));
+
+  const renderNowLine = (d: Date) => {
+    if (!calIsSameDay(d, now)) return null;
+    const h = now.getHours() + now.getMinutes() / 60;
+    if (h < CAL_HOUR_START || h > CAL_HOUR_END) return null;
+    return (
+      <div className={s.nowLine} style={{ top: `${nowTopPct}%` }}>
+        <div className={s.nowDot} />
+      </div>
+    );
+  };
+
+  // Merge external drafts + live drag drafts (live takes priority)
+  const activeDrafts = liveDrafts.length > 0 ? liveDrafts : drafts;
+
+  const renderDraftBlocks = (d: Date) => {
+    const key = d.toISOString().slice(0, 10);
+    return activeDrafts
+      .filter(dr => dr.date === key && dr.start < dr.end)
+      .map((dr, i) => {
+        const startIso = `${dr.date}T${dr.start}:00`;
+        const endIso   = `${dr.date}T${dr.end}:00`;
+        const topP   = calTopPct(startIso);
+        const heightP = calHeightPct(startIso, endIso);
+        return (
+          <div key={`draft-${i}`}
+            className={`${s.eventBlock} ${s.eventBlockDraft}`}
+            style={{ top: `${topP}%`, height: `${heightP}%` }}
+          >
+            <div className={`${s.eventTitle} ${s.eventTitleDraft}`}>
+              {dr.label || `${dr.start} – ${dr.end}`}
+            </div>
+            {dr.label && (
+              <div className={`${s.eventMeta} ${s.eventMetaOther}`}>{dr.start} – {dr.end}</div>
+            )}
+            {/* Floating time tooltip at top of block */}
+            {liveDrafts.length > 0 && i === 0 && (
+              <div className={s.dragTooltip} style={{ top: '-18px' }}>
+                {dr.start}
+              </div>
+            )}
+          </div>
+        );
+      });
+  };
+
+  const renderMonthDraftBlocks = (d: Date) => {
+    const key = d.toISOString().slice(0, 10);
+    return (liveDrafts.length > 0 ? liveDrafts : drafts)
+      .filter(dr => dr.date === key && dr.start < dr.end)
+      .map((dr, i) => (
+        <div key={`draft-${i}`} className={`${s.monthEvent} ${s.monthEventDraft}`}>
+          {dr.label ? `${dr.start} ${dr.label}` : `${dr.start} – ${dr.end}`}
+        </div>
+      ));
+  };
+
+  const renderTimeGutter = () => (
+    <div className={s.timeGutter}>
+      {HOURS.map(h => (
+        <div key={h} className={s.timeLabel}>
+          {String(h).padStart(2,'0')}:00
+        </div>
+      ))}
+    </div>
+  );
+
+  // ── Month view ──────────────────────────────────────────────────────────────
+  if (view === 'month') {
+    const gridStart = calStartOfWeek(calStartOfMonth(anchor));
+    const cells = Array.from({ length: 42 }, (_, i) => calAddDays(gridStart, i));
+    return (
+      <div className={s.body}>
+        {interactive && (
+          <div className={s.monthHint}>
+            {pendingDate
+              ? 'Now click the end date'
+              : 'Click a day to start selecting a range'}
+          </div>
+        )}
+        <div className={s.monthGrid}>
+          {WEEKDAYS.map(d => <div key={d} className={s.monthDayHeader}>{d}</div>)}
+          {cells.map((d, i) => {
+            const inMonth  = d.getMonth() === anchor.getMonth();
+            const todayDay = calIsToday(d);
+            const key      = d.toISOString().slice(0, 10);
+            const evts     = bookingsByDay.get(key) ?? [];
+            const visible  = evts.slice(0, 3);
+            const overflow = evts.length - visible.length;
+            const isPending = pendingDate === key;
+            // Range highlight: use lexicographic string comparison (ISO dates sort correctly)
+            // Show between pendingDate and hoverDate (or committed end) as user moves mouse
+            const rangeEnd   = hoverDate ?? pendingDate;
+            const rangeStart = pendingDate;
+            const isInRange  = rangeStart !== null && rangeEnd !== null && rangeStart !== rangeEnd &&
+              key > (rangeStart < rangeEnd ? rangeStart : rangeEnd) &&
+              key < (rangeStart < rangeEnd ? rangeEnd : rangeStart);
+            const isRangeEnd = rangeEnd !== null && rangeEnd !== rangeStart && key === rangeEnd && pendingDate !== null;
+
+            return (
+              <div
+                key={i}
+                className={[
+                  s.monthCell,
+                  !inMonth     ? s.monthCellOtherMonth  : '',
+                  todayDay     ? s.monthCellToday        : '',
+                  isPending    ? s.monthCellPending      : '',
+                  isInRange    ? s.monthCellInRange      : '',
+                  isRangeEnd   ? s.monthCellPending      : '',
+                  interactive  ? s.monthCellInteractive  : '',
+                ].join(' ')}
+                onClick={() => handleMonthCellClick(key)}
+                onMouseEnter={interactive && pendingDate ? () => setHoverDate(key) : undefined}
+                onMouseLeave={interactive && pendingDate ? () => setHoverDate(null) : undefined}
+              >
+                <div className={`${s.monthDayNum} ${todayDay ? s.monthDayNumToday : ''}`}>
+                  {d.getDate()}
+                </div>
+                {renderMonthDraftBlocks(d)}
+                {visible.map(({ booking, isOwn }) => (
+                  <Tooltip key={booking.id}
+                    content={<EventPopup booking={booking} isOwn={isOwn}
+                      onCancel={isOwn && onCancelBooking ? () => onCancelBooking(booking) : undefined}
+                      cancelling={cancellingId === booking.id} />}
+                    relationship="description" positioning="below-start" withArrow>
+                    <div className={`${s.monthEvent} ${!isOwn ? s.monthEventOther : ''}`}
+                      onClick={e => e.stopPropagation()}>
+                      {calFormatTime(booking.start_time)} {booking.desk.name}
+                    </div>
+                  </Tooltip>
+                ))}
+                {overflow > 0 && <div className={s.monthMore}>+{overflow} more</div>}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  }
+
+  // ── Day / Week view ─────────────────────────────────────────────────────────
+  const isMulti = days.length > 1;
+  return (
+    <>
+      {isMulti && (
+        <div className={s.colHeaderRow}>
+          <div style={{ width: '52px' }} />
+          <div className={s.colHeader}>
+            {days.map((d, i) => {
+              const today = calIsToday(d);
+              return (
+                <div key={i} className={`${s.colHeaderCell} ${today ? s.colHeaderToday : ''}`}>
+                  <div style={{ fontSize: '10px', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    {WEEKDAYS[(d.getDay() + 6) % 7]}
+                  </div>
+                  {today
+                    ? <span className={s.todayCircle}>{d.getDate()}</span>
+                    : <span style={{ fontSize: tokens.fontSizeBase300 }}>{d.getDate()}</span>
+                  }
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
+      <div className={s.body}>
+        <div className={s.timeGrid}>
+          {renderTimeGutter()}
+          <div className={s.dayColumns}>
+            {days.map((d, i) => {
+              const key  = d.toISOString().slice(0, 10);
+              const evts = bookingsByDay.get(key) ?? [];
+              return (
+                <div
+                  key={i}
+                  ref={el => { colRefs.current[i] = el; }}
+                  className={`${s.dayCol} ${interactive ? s.dayColInteractive : ''}`}
+                  style={i === 0 ? { borderLeft: 'none' } : {}}
+                  onMouseDown={interactive ? (e) => handleColMouseDown(e, i) : undefined}
+                >
+                  {renderHourLines()}
+                  {renderNowLine(d)}
+                  {renderDraftBlocks(d)}
+                  {evts.map(({ booking, isOwn }) => (
+                    <Tooltip key={booking.id}
+                      content={<EventPopup booking={booking} isOwn={isOwn}
+                        onCancel={isOwn && onCancelBooking ? () => onCancelBooking(booking) : undefined}
+                        cancelling={cancellingId === booking.id} />}
+                      relationship="description" positioning="below-start" withArrow>
+                      <div
+                        className={`${s.eventBlock} ${!isOwn ? s.eventBlockOther : ''}`}
+                        style={{
+                          top: `${calTopPct(booking.start_time)}%`,
+                          height: `${calHeightPct(booking.start_time, booking.end_time)}%`,
+                          // Don't swallow mousedown events when dragging
+                          pointerEvents: interactive && dragRef.current.active ? 'none' : 'auto',
+                        }}
+                      >
+                        <div className={`${s.eventTitle} ${!isOwn ? s.eventTitleOther : ''}`}>{booking.desk.name}</div>
+                        <div className={`${s.eventMeta} ${!isOwn ? s.eventMetaOther : ''}`}>
+                          {calFormatTime(booking.start_time)}–{calFormatTime(booking.end_time)}
+                        </div>
+                        {!isOwn && <div className={`${s.eventMeta} ${s.eventMetaOther}`}>{booking.username}</div>}
+                      </div>
+                    </Tooltip>
+                  ))}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      </div>
+    </>
+  );
+};
+
+// ─── BookingsCalendar (My Bookings view) ──────────────────────────────────────
+
+interface BookingsCalendarProps {
+  refreshToken?: number;
+  onBookingCancelled?: () => void;
+}
+
+export const BookingsCalendar: React.FC<BookingsCalendarProps> = ({
+  refreshToken, onBookingCancelled,
+}) => {
+  const s = useCalStyles();
+  const { authenticatedFetch } = useAuth();
+  const bookingApi = createBookingApi(authenticatedFetch);
+
+  const [view, setView]       = useState<ViewMode>('week');
+  const [anchor, setAnchor]   = useState<Date>(calStartOfDay(new Date()));
+  const [bookings, setBookings] = useState<Booking[]>([]);
+  const [loading, setLoading]  = useState(true);
+  const [cancellingId, setCancellingId] = useState<number | null>(null);
+
+  const days: Date[] = useMemo(() => {
+    if (view === 'day')  return [anchor];
+    if (view === 'week') {
+      const s = calStartOfWeek(anchor);
+      return Array.from({ length: 7 }, (_, i) => calAddDays(s, i));
+    }
+    const s = calStartOfWeek(calStartOfMonth(anchor));
+    return Array.from({ length: 42 }, (_, i) => calAddDays(s, i));
+  }, [view, anchor.toISOString().slice(0, 10)]);
+
+  const fetchStart = days[0];
+  const fetchEnd   = calAddDays(days[days.length - 1], 1);
+
+  const loadBookings = useCallback(async () => {
+    setLoading(true);
+    try {
+      const data = await bookingApi.getMyBookings({ start: fetchStart.toISOString(), end: fetchEnd.toISOString() });
+      setBookings(data);
+    } catch { } finally { setLoading(false); }
+  }, [fetchStart.toISOString(), fetchEnd.toISOString()]);
+
+  useEffect(() => { loadBookings(); }, [loadBookings]);
+  useEffect(() => { if (refreshToken !== undefined) loadBookings(); }, [refreshToken]);
+
+  const handleCancel = async (booking: Booking) => {
+    if (!confirm(`Cancel ${booking.desk.name} on ${calFormatShortDate(new Date(booking.start_time))}?`)) return;
+    setCancellingId(booking.id);
+    try {
+      await bookingApi.cancelBooking(booking.id);
+      setBookings(prev => prev.filter(b => b.id !== booking.id));
+      onBookingCancelled?.();
+    } catch (err: any) { alert(err.message || 'Failed to cancel'); }
+    finally { setCancellingId(null); }
+  };
+
+  const navigate = (dir: -1 | 1) => setAnchor(prev => {
+    if (view === 'day')  return calAddDays(prev, dir);
+    if (view === 'week') return calAddDays(prev, dir * 7);
+    return new Date(prev.getFullYear(), prev.getMonth() + dir, 1);
+  });
+
+  const goToday = () => {
+    const t = calStartOfDay(new Date());
+    setAnchor(view === 'week' ? calStartOfWeek(t) : t);
+  };
+
+  const title = useMemo(() => {
+    if (view === 'day')  return calFormatShortDate(anchor);
+    if (view === 'week') {
+      const start = calStartOfWeek(anchor);
+      const end   = calAddDays(start, 6);
+      const opts: Intl.DateTimeFormatOptions = { month: 'short', day: 'numeric' };
+      return `${start.toLocaleDateString([], opts)} – ${end.toLocaleDateString([], { ...opts, year: 'numeric' })}`;
+    }
+    return anchor.toLocaleDateString([], { month: 'long', year: 'numeric' });
+  }, [view, anchor]);
+
+  const bookingsByDay = useMemo(() => {
+    const map = new Map<string, Array<{ booking: Booking; isOwn: boolean }>>();
+    bookings.forEach(b => {
+      const key = new Date(b.start_time).toISOString().slice(0, 10);
+      if (!map.has(key)) map.set(key, []);
+      map.get(key)!.push({ booking: b, isOwn: true });
+    });
+    return map;
+  }, [bookings]);
+
+  return (
+    <div className={s.root}>
+      <div className={s.toolbar}>
+        <div className={s.toolbarLeft}>
+          <Button size="small" appearance="subtle" onClick={goToday}>Today</Button>
+          <Button size="small" appearance="subtle" icon={<ChevronLeft20Regular />} onClick={() => navigate(-1)} />
+          <Button size="small" appearance="subtle" icon={<ChevronRight20Regular />} onClick={() => navigate(1)} />
+          <Text className={s.titleText}>{title}</Text>
+        </div>
+        <div className={s.toolbarRight}>
+          {(['day', 'week', 'month'] as ViewMode[]).map(v => (
+            <Button key={v} size="small"
+              appearance={view === v ? 'primary' : 'subtle'}
+              icon={v === 'day' ? <CalendarDay20Regular /> : v === 'week' ? <CalendarWeekNumbers20Regular /> : <CalendarMonth20Regular />}
+              onClick={() => setView(v)}
+            >
+              {v.charAt(0).toUpperCase() + v.slice(1)}
+            </Button>
+          ))}
+        </div>
+      </div>
+
+      {loading ? (
+        <div className={s.loadingWrap}><Spinner size="medium" /></div>
+      ) : bookings.length === 0 && view !== 'month' ? (
+        <div className={s.empty}>
+          <CalendarLtr20Regular style={{ fontSize: '36px' }} />
+          <Text size={300} weight="semibold">No bookings in this period</Text>
+          <Text size={200}>Select a room on the map to book a desk</Text>
+        </div>
+      ) : (
+        <CalendarGrid
+          view={view}
+          anchor={anchor}
+          days={view === 'month' ? [] : days}
+          bookingsByDay={bookingsByDay}
+          onCancelBooking={handleCancel}
+          cancellingId={cancellingId}
+        />
+      )}
+    </div>
+  );
+};
+
+export default BookingsCalendar;

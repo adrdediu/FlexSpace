@@ -5,7 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import websocketService from '../services/websocketService';
 import { TopBar } from './TopBar';
 import { StatusBar } from './StatusBar';
-import { FloatingPanelGrid, FloatingPanel, ContentGrid, Card, Section } from './Layout';
+import { FloatingPanelGrid, FloatingPanel } from './Layout';
 import { SettingsDialog, ProfileDialog } from './Common';
 import { AdminDashboard } from './Admin';
 import { type WsStatus, type NavSection } from '../types/common';
@@ -13,6 +13,7 @@ import { type Desk, type Room } from './Dashboard/types';
 import { RoomMapViewer } from './Dashboard/RoomMapViewer';
 import { LocationBrowser } from './Dashboard/LocationBrowser';
 import { TodayPanel } from './Dashboard/TodayPanel';
+import { BookingsCalendar } from './Dashboard/BookingsCalendar';
 import { type RoomWithDesks } from '../services/roomApi';
 
 const useStyles = makeStyles({
@@ -321,61 +322,25 @@ const Home: React.FC<HomeProps> = ({ onMount }) => {
 
   const renderMyBookings = () => (
     <FloatingPanelGrid>
-      {/* Active Booking Panel */}
       <FloatingPanel
-        title="Active Now"
-        position="top-left"
-        size="medium"
+        title="My Bookings"
+        position="center"
+        size="custom"
         opacity="glass"
+        style={{
+          left: '24px',
+          right: '24px',
+          top: '16px',
+          bottom: '16px',
+          width: 'auto',
+          height: 'calc(100% - 32px)',
+          transform: 'none',
+        }}
       >
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          <Text weight="semibold" size={400}>Desk 42 - Conference Room A</Text>
-          <Text size={300}>Today, 9:00 AM - 5:00 PM</Text>
-          <Text size={200}>Floor 3, San Francisco Office</Text>
-        </div>
-      </FloatingPanel>
-
-      {/* Upcoming Bookings Panel */}
-      <FloatingPanel
-        title="Upcoming Bookings"
-        position="bottom-left"
-        size="large"
-        opacity="glass"
-        actions={<Button appearance="primary">New Booking</Button>}
-      >
-        <ContentGrid columns="1" gap="m">
-          {mockUpcomingBookings.map(booking => (
-            <Card
-              key={booking.id}
-              title={booking.desk}
-              subtitle={booking.date}
-              variant="outlined"
-              footer={
-                <div style={{ display: 'flex', gap: '8px', width: '100%', justifyContent: 'flex-end' }}>
-                  <Button appearance="subtle" size="small">Modify</Button>
-                  <Button appearance="subtle" size="small">Cancel</Button>
-                </div>
-              }
-            >
-              <Text size={200}>{booking.room} • {booking.location}</Text>
-            </Card>
-          ))}
-        </ContentGrid>
-      </FloatingPanel>
-
-      {/* Quick Actions */}
-      <FloatingPanel
-        position="top-right"
-        size="small"
-        opacity="glass"
-      >
-        <Section spacing="none">
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            <Button appearance="primary" style={{ width: '100%' }}>New Booking</Button>
-            <Button appearance="subtle" style={{ width: '100%' }}>View Calendar</Button>
-            <Button appearance="subtle" style={{ width: '100%' }}>History</Button>
-          </div>
-        </Section>
+        <BookingsCalendar
+          refreshToken={bookingRefreshToken}
+          onBookingCancelled={handleBookingChange}
+        />
       </FloatingPanel>
     </FloatingPanelGrid>
   );
