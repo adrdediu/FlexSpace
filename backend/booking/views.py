@@ -605,11 +605,17 @@ class BookingViewSet(viewsets.ModelViewSet):
                 raise ValidationError({"detail": "Invalid timestamps"})
 
             now = timezone.now()
-            if s_dt < now:
+            # On updates, allow keeping the original start even if it's now in the past.
+            # Only reject a past start if the user is actively moving it to a new past time.
+            start_unchanged = (
+                booking.start_time is not None and
+                abs((s_dt - booking.start_time).total_seconds()) < 60
+            )
+            if s_dt < now and not start_unchanged:
                 raise ValidationError({"detail": "Booking start time cannot be in the past."})
             if e_dt <= s_dt:
                 raise ValidationError({"detail": "end_time must be after start_time."})
-            
+
             with transaction.atomic():
                 desk_locked = Desk.objects.select_for_update().get(pk=desk.pk)
 
@@ -698,7 +704,12 @@ class BookingViewSet(viewsets.ModelViewSet):
                 return Response({"detail": "Invalid interval timestamps"}, status = 400)
             if not s_dt or not e_dt or e_dt <= s_dt:
                 return Response({"detail": "Each interval must have valid start_time < end_time"}, status=400)
-            if s_dt < now:
+            # Allow keeping the original booking start even if it's now in the past.
+            start_unchanged = (
+                base_booking.start_time is not None and
+                abs((s_dt - base_booking.start_time).total_seconds()) < 60
+            )
+            if s_dt < now and not start_unchanged:
                 return Response({"detail": "Booking start time cannot be in the past."}, status=400)
             parsed.append((s_dt, e_dt))
 

@@ -195,6 +195,20 @@ export const useCalStyles = makeStyles({
     opacity: 0.85, cursor: 'default',
     transition: 'none',
   },
+  // Own booking in BookingModal clickMode — user can click to shorten
+  eventBlockOwnClickMode: {
+    cursor: 'ns-resize',
+    opacity: 0.78,
+    borderLeft: `3px solid ${tokens.colorBrandStroke1}`,
+    outline: `2px dashed ${tokens.colorBrandStroke1}`,
+    outlineOffset: '-3px',
+    ':hover': { opacity: 1, filter: 'brightness(1.06)' },
+  },
+  // Another user's booking in BookingModal clickMode — blocks the click
+  eventBlockBlocked: {
+    cursor: 'not-allowed',
+    opacity: 0.65,
+  },
   eventTitle:      { fontSize: '11px', fontWeight: tokens.fontWeightSemibold, color: tokens.colorBrandForeground1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: '1.3' },
   eventTitleOther: { color: tokens.colorPaletteRedForeground1 },
   eventTitleDraft: { color: tokens.colorPaletteTealForeground2 },
@@ -388,6 +402,9 @@ export interface CalendarGridProps {
    *  The caller manages the two-step click-click logic.
    *  When false (default): drag to select fires onInteract with full range. */
   clickMode?: boolean;
+  /** When true, free-slot column clicks are blocked — used when a shorten/edit
+   *  selection is already committed and waiting for Save or Cancel. */
+  clickLocked?: boolean;
   /** Optional array of date strings to attach as data-cal-col attributes on each day column (for external hover tracking). */
   calColDateAttr?: string[];
   onInteract?: (sel: CalendarInteraction) => void;
@@ -400,6 +417,11 @@ export interface CalendarGridProps {
    * All other booking blocks remain non-interactive in clickMode.
    */
   editingBookingId?: number | null;
+  /**
+   * Called in clickMode when the user clicks their own booking block.
+   * BookingModal uses this to enter shortening mode (pre-fill start, pick new end).
+   */
+  onOwnBookingClick?: (booking: Booking) => void;
 }
 
 // Internal drag state (lives in a ref — no re-renders during drag)
@@ -413,9 +435,9 @@ interface DragState {
 
 export const CalendarGrid: React.FC<CalendarGridProps> = ({
   view, anchor, days, bookingsByDay,
-  drafts = [], interactive = false, clickMode = false, calColDateAttr,
+  drafts = [], interactive = false, clickMode = false, clickLocked = false, calColDateAttr,
   onInteract, onCancelBooking, onEditBooking, cancellingId,
-  editingBookingId = null,
+  editingBookingId = null, onOwnBookingClick,
 }) => {
   const s = useCalStyles();
   const [now, setNow] = useState(new Date());
@@ -519,14 +541,46 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
   // ── Mouse handlers ──
   const handleColClick = useCallback((e: React.MouseEvent, colIdx: number) => {
     if (!interactive || !clickMode || !onInteract) return;
-    const hour = snapHour(getHourFromY(e.clientY, colIdx));
     const date = days[colIdx] ? calDateStr(days[colIdx]) : undefined;
     if (!date) return;
-    // Bug 1: reject clicks in the past
-    if (days[colIdx] && isPastHour(days[colIdx], hour)) return;
-    const timeStr = hourToTimeStr(hour);
+
+    const rawHour = getHourFromY(e.clientY, colIdx);
+    const snappedHour = snapHour(rawHour);
+
+    const colEvts = bookingsByDay.get(date) ?? [];
+    const toH = (iso: string) => { const d = new Date(iso); return d.getHours() + d.getMinutes() / 60; };
+
+    // Check if click lands inside the booking currently being edited.
+    const isInsideEditingBooking = editingBookingId != null && colEvts.some(({ booking }) =>
+      booking.id === editingBookingId &&
+      rawHour >= toH(booking.start_time) &&
+      rawHour < toH(booking.end_time)
+    );
+
+    // clickLocked: selection committed, waiting for Save/Cancel.
+    // Block free-slot clicks entirely — but always allow clicks on the editing
+    // booking itself so the user can re-click to adjust their choice.
+    if (clickLocked && !isInsideEditingBooking) return;
+
+    // Reject past-time clicks on free slots. Inside the editing booking's own
+    // block the user is adjusting an existing interval — allow it. Everywhere else
+    // (including other columns on today) the normal past-time wall applies.
+    if (!isInsideEditingBooking && days[colIdx] && isPastHour(days[colIdx], snappedHour)) return;
+
+    // Block clicks inside any booked interval — own or other — unless this is
+    // the exact booking currently being edited (pointerEvents:none, falls through).
+    for (const { booking, isOwn } of colEvts) {
+      const bStart = toH(booking.start_time);
+      const bEnd   = toH(booking.end_time);
+      if (rawHour >= bStart && rawHour < bEnd) {
+        if (isOwn && booking.id === editingBookingId) continue;
+        return;
+      }
+    }
+
+    const timeStr = hourToTimeStr(snappedHour);
     onInteract({ startDate: date, endDate: date, startTime: timeStr, endTime: timeStr });
-  }, [interactive, clickMode, getHourFromY, days, onInteract, isPastHour]);
+  }, [interactive, clickMode, clickLocked, getHourFromY, days, onInteract, isPastHour, bookingsByDay, onOwnBookingClick, editingBookingId]);
 
   const handleColMouseDown = useCallback((e: React.MouseEvent, colIdx: number) => {
     if (!interactive || e.button !== 0 || clickMode) return;
@@ -840,45 +894,116 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
                     if (visEnd <= visStart) return null;
                     const topP    = ((visStart - CAL_HOUR_START) / CAL_HOUR_RANGE) * 100;
                     const heightP = Math.max(1.5, ((visEnd - visStart) / CAL_HOUR_RANGE) * 100);
+                    // canEdit: clicking the event block opens the full edit modal (non-clickMode only)
                     const canEdit = isOwn && !!onEditBooking && !clickMode;
-                    // Bug 2: In edit mode, the booking being edited must be click-transparent
-                    //         so the user can pick a new time overlapping it.
-                    // Bug 3: In clickMode (BookingModal), ALL event blocks are transparent to
-                    //         clicks so the column handler always receives them. The Tooltip
-                    //         is still shown on hover — we just prevent click interception.
+
+                    // The booking currently being re-timed in the modal → fully transparent
                     const isEditingThis = clickMode && editingBookingId === booking.id;
-                    const blockPointerEvents =
-                      (dragRef.current.active)   ? 'none'  // during drag: never block
-                      : clickMode                ? 'none'  // Bug 3: in booking modal, never intercept clicks
-                      : 'auto';                            // normal calendar view: interactive as usual
-                    return (
-                    <Tooltip key={`${booking.id}-${calDateStr(d)}`}
-                      content={<EventPopup booking={booking} isOwn={isOwn}
-                        onEdit={isOwn && onEditBooking && !clickMode ? () => onEditBooking(booking) : undefined}
-                        onCancel={isOwn && onCancelBooking && !clickMode ? () => onCancelBooking(booking) : undefined}
-                        cancelling={cancellingId === booking.id} />}
-                      relationship="description" positioning="below-start" withArrow>
+
+                    // Derive per-block pointer-events and class:
+                    // • isEditingThis      → transparent, user clicks through to pick new time
+                    // • clickMode + own    → intercept click to enter shortening mode
+                    // • clickMode + other  → intercept click to BLOCK it (slot is taken)
+                    // • normal view        → standard interactive behaviour
+                    let blockPointerEvents: 'none' | 'auto' = 'auto';
+                    let extraClass = '';
+                    let blockOpacity: number | undefined;
+
+                    if (dragRef.current.active) {
+                      blockPointerEvents = 'none';
+                    } else if (isEditingThis) {
+                      blockPointerEvents = 'none';
+                      blockOpacity = 0.4;
+                      extraClass = s.eventBlockDraft;
+                    } else if (clickMode && isOwn) {
+                      // Own block is clickable: receives the click directly.
+                      // The onClick on the block fires onOwnBookingClick (sets edit mode).
+                      blockPointerEvents = 'auto';
+                      extraClass = s.eventBlockOwnClickMode;
+                    } else if (clickMode && !isOwn) {
+                      // Blocks the click — another user's slot is taken
+                      extraClass = s.eventBlockBlocked;
+                    }
+
+                    // Tooltip content: blocked slot gets an "unavailable" message
+                    const popupContent = (clickMode && !isOwn)
+                      ? (
+                        <div style={{ padding: '6px 10px', minWidth: '160px' }}>
+                          <div style={{ fontWeight: 600, fontSize: '13px', marginBottom: '4px' }}>
+                            {calFormatTime(booking.start_time)}–{calFormatTime(booking.end_time)}
+                          </div>
+                          <div style={{ fontSize: '11px', color: tokens.colorPaletteRedForeground1 }}>
+                            Booked by {booking.username}
+                          </div>
+                          <div style={{ fontSize: '11px', color: tokens.colorNeutralForeground3, marginTop: '2px', fontStyle: 'italic' }}>
+                            This slot is unavailable
+                          </div>
+                        </div>
+                      )
+                      : (
+                        <EventPopup booking={booking} isOwn={isOwn}
+                          onEdit={isOwn && onEditBooking && !clickMode ? () => onEditBooking(booking) : undefined}
+                          onCancel={isOwn && onCancelBooking && !clickMode ? () => onCancelBooking(booking) : undefined}
+                          cancelling={cancellingId === booking.id} />
+                      );
+
+                    // In clickMode, own-booking blocks must NOT be wrapped in a Tooltip —
+                    // Fluent's Tooltip trigger intercepts pointer events before the inner div
+                    // receives them, breaking the onClick. We render them bare (the "click to
+                    // shorten" label inside the block is the affordance). Other-users' blocked
+                    // blocks still need the Tooltip so the "unavailable" message appears.
+                    const blockDiv = (
                       <div
-                        className={`${s.eventBlock} ${!isOwn ? s.eventBlockOther : ''} ${isEditingThis ? s.eventBlockDraft : ''}`}
+                        key={`${booking.id}-${calDateStr(d)}`}
+                        className={`${s.eventBlock} ${!isOwn ? s.eventBlockOther : ''} ${extraClass}`}
                         style={{
                           top: `${topP}%`,
                           height: `${heightP}%`,
                           pointerEvents: blockPointerEvents,
-                          cursor: canEdit ? 'pointer' : clickMode ? 'default' : undefined,
-                          // Bug 2: visually indicate the editing booking is click-through
-                          opacity: isEditingThis ? 0.5 : undefined,
+                          opacity: blockOpacity,
+                          cursor: canEdit ? 'pointer' : undefined,
                         }}
-                        onClick={canEdit ? (e) => { e.stopPropagation(); onEditBooking!(booking); } : undefined}
+                        onClick={
+                          isEditingThis
+                            ? undefined
+                          : clickMode && isOwn && onOwnBookingClick
+                            // Own booking in modal: fire edit callback, stop propagation
+                            // so the column click doesn't also fire (which would call onInteract
+                            // and immediately set a new start time, overwriting the edit setup).
+                            ? (e) => { e.stopPropagation(); onOwnBookingClick(booking); }
+                          : clickMode && !isOwn
+                            ? (e) => { e.stopPropagation(); }
+                          : canEdit
+                            ? (e) => { e.stopPropagation(); onEditBooking!(booking); }
+                          : undefined
+                        }
                       >
                         <div className={`${s.eventTitle} ${!isOwn ? s.eventTitleOther : ''}`}>{booking.desk.name}</div>
                         <div className={`${s.eventMeta} ${!isOwn ? s.eventMetaOther : ''}`}>
                           {calFormatTime(booking.start_time)}–{calFormatTime(booking.end_time)}
                         </div>
-                        {!isOwn && <div className={`${s.eventMeta} ${s.eventMetaOther}`}>{booking.username}</div>}
-                        {isEditingThis && (
-                          <div className={`${s.eventMeta} ${s.eventTitleDraft}`}>click through to edit</div>
+                        {!isOwn && !clickMode && (
+                          <div className={`${s.eventMeta} ${s.eventMetaOther}`}>{booking.username}</div>
+                        )}
+                        {clickMode && isOwn && !isEditingThis && (
+                          <div className={`${s.eventMeta} ${s.eventTitleDraft}`}>click to edit</div>
+                        )}
+                        {clickMode && !isOwn && (
+                          <div className={`${s.eventMeta} ${s.eventMetaOther}`}>{booking.username}</div>
                         )}
                       </div>
+                    );
+
+                    // Wrap in Tooltip only when it adds value and won't intercept our clicks
+                    if (clickMode && isOwn && !isEditingThis) {
+                      // Own block in modal: no tooltip — the block itself is the affordance
+                      return blockDiv;
+                    }
+                    return (
+                    <Tooltip key={`${booking.id}-${calDateStr(d)}`}
+                      content={popupContent}
+                      relationship="description" positioning="below-start" withArrow>
+                      {blockDiv}
                     </Tooltip>
                     );
                   })}

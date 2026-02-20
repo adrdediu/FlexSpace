@@ -10,6 +10,7 @@ import {
 import {
   CalendarLtr20Regular,
   Delete20Regular,
+  Edit20Regular,
   Clock20Regular,
   BuildingRegular,
   DoorRegular,
@@ -82,8 +83,12 @@ const useStyles = makeStyles({
     position: 'relative',
   },
   bookingCardToday: {
-    borderColor: tokens.colorBrandStroke1,
-    backgroundColor: tokens.colorBrandBackground2,
+    borderTopColor: tokens.colorNeutralStroke2,
+    borderRightColor: tokens.colorNeutralStroke2,
+    borderBottomColor: tokens.colorNeutralStroke2,
+    borderLeftColor: tokens.colorBrandStroke1,
+    borderLeftWidth: '3px',
+    backgroundColor: tokens.colorNeutralBackground1,
   },
   bookingCardHeader: {
     display: 'flex',
@@ -106,13 +111,19 @@ const useStyles = makeStyles({
     alignItems: 'center',
     gap: tokens.spacingHorizontalXS,
     fontSize: tokens.fontSizeBase200,
-    color: tokens.colorNeutralForeground3,
+    color: tokens.colorNeutralForeground2,
   },
   todayBadgeRow: {
     display: 'flex',
     alignItems: 'center',
     gap: tokens.spacingHorizontalXS,
     marginBottom: tokens.spacingVerticalXS,
+  },
+
+  bookingActions: {
+    display: 'flex',
+    gap: tokens.spacingHorizontalXS,
+    marginTop: tokens.spacingVerticalXS,
   },
 
   // Empty
@@ -177,6 +188,10 @@ interface TodayPanelProps {
   refreshToken?: number;
   /** Called when user cancels a booking */
   onBookingCancelled?: () => void;
+  /** Called when user clicks a booking card — navigate to its room + highlight desk */
+  onBookingClick?: (booking: Booking) => void;
+  /** Called when user wants to edit a booking */
+  onBookingEdit?: (booking: Booking) => void;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -184,6 +199,8 @@ interface TodayPanelProps {
 export const TodayPanel: React.FC<TodayPanelProps> = ({
   refreshToken,
   onBookingCancelled,
+  onBookingClick,
+  onBookingEdit,
 }) => {
   const styles = useStyles();
   const { authenticatedFetch } = useAuth();
@@ -274,6 +291,8 @@ export const TodayPanel: React.FC<TodayPanelProps> = ({
                   isToday
                   cancelling={cancellingId === booking.id}
                   onCancel={() => handleCancel(booking)}
+                  onNavigate={onBookingClick ? () => onBookingClick(booking) : undefined}
+                  onEdit={onBookingEdit ? () => onBookingEdit(booking) : undefined}
                 />
               ))}
             </>
@@ -292,6 +311,8 @@ export const TodayPanel: React.FC<TodayPanelProps> = ({
                   isToday={false}
                   cancelling={cancellingId === booking.id}
                   onCancel={() => handleCancel(booking)}
+                  onNavigate={onBookingClick ? () => onBookingClick(booking) : undefined}
+                  onEdit={onBookingEdit ? () => onBookingEdit(booking) : undefined}
                 />
               ))}
             </>
@@ -309,11 +330,17 @@ const BookingCard: React.FC<{
   isToday: boolean;
   cancelling: boolean;
   onCancel: () => void;
-}> = ({ booking, isToday, cancelling, onCancel }) => {
+  onNavigate?: () => void;
+  onEdit?: () => void;
+}> = ({ booking, isToday, cancelling, onCancel, onNavigate, onEdit }) => {
   const styles = useStyles();
 
   return (
-    <div className={`${styles.bookingCard} ${isToday ? styles.bookingCardToday : ''}`}>
+    <div
+      className={`${styles.bookingCard} ${isToday ? styles.bookingCardToday : ''}`}
+      style={onNavigate ? { cursor: 'pointer' } : undefined}
+      onClick={onNavigate}
+    >
       <div className={styles.bookingCardHeader}>
         <div>
           {isToday && (
@@ -323,14 +350,6 @@ const BookingCard: React.FC<{
           )}
           <div className={styles.bookingDeskName}>{booking.desk.name}</div>
         </div>
-        <Button
-          appearance="subtle"
-          size="small"
-          icon={cancelling ? <Spinner size="tiny" /> : <Delete20Regular />}
-          onClick={onCancel}
-          disabled={cancelling}
-          title="Cancel booking"
-        />
       </div>
 
       <div className={styles.bookingMeta}>
@@ -351,6 +370,32 @@ const BookingCard: React.FC<{
           <BuildingRegular style={{ fontSize: '12px' }} />
           <span>{booking.location_name}</span>
         </div>
+      </div>
+
+      {/* Action buttons — stop propagation so card click doesn't fire too */}
+      <div className={styles.bookingActions} onClick={e => e.stopPropagation()}>
+        {onEdit && (
+          <Button
+            appearance="subtle"
+            size="small"
+            icon={<Edit20Regular />}
+            onClick={onEdit}
+            title="Edit booking"
+          >
+            Edit
+          </Button>
+        )}
+        <Button
+          appearance="subtle"
+          size="small"
+          icon={cancelling ? <Spinner size="tiny" /> : <Delete20Regular />}
+          onClick={onCancel}
+          disabled={cancelling}
+          title="Cancel booking"
+          style={{ color: tokens.colorPaletteRedForeground1 }}
+        >
+          Cancel
+        </Button>
       </div>
     </div>
   );

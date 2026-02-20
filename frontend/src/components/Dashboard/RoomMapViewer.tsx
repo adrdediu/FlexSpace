@@ -210,6 +210,10 @@ export interface RoomMapViewerProps {
   room: RoomWithDesks;
   onClose?: () => void;
   onBookingChange?: () => void;
+  /** If set on mount, auto-select this desk and open the booking modal for editing */
+  initialSelectedDeskId?: number | null;
+  /** If set alongside initialSelectedDeskId, open in edit mode for this booking */
+  initialEditingBooking?: import('../../services/bookingApi').Booking | null;
 }
 
 // ─── Marker helpers ───────────────────────────────────────────────────────────
@@ -243,7 +247,7 @@ function canBook(desk: DeskLiveState, myUserId?: number): boolean {
 
 // ─── Main Component ───────────────────────────────────────────────────────────
 
-export const RoomMapViewer: React.FC<RoomMapViewerProps> = ({ room, onClose, onBookingChange }) => {
+export const RoomMapViewer: React.FC<RoomMapViewerProps> = ({ room, onClose, onBookingChange, initialSelectedDeskId, initialEditingBooking }) => {
   const styles = useStyles();
   const { authenticatedFetch, user } = useAuth();
   const bookingApi = createBookingApi(authenticatedFetch);
@@ -302,6 +306,20 @@ export const RoomMapViewer: React.FC<RoomMapViewerProps> = ({ room, onClose, onB
     setPan({ x: 0, y: 0 });
     isZoomedToDeskRef.current = false;
   }, [room.id]);
+
+  // ── Auto-select desk + open modal when navigating from TodayPanel ──
+  useEffect(() => {
+    if (!initialSelectedDeskId) return;
+    const desk = desks.find(d => d.id === initialSelectedDeskId);
+    if (!desk) return;
+    setSelectedDeskId(initialSelectedDeskId);
+    if (initialEditingBooking) {
+      openingBookingRef.current = true;
+      setEditingBooking(initialEditingBooking);
+      setBookingDesk(desk);
+      setBookingModalOpen(true);
+    }
+  }, [initialSelectedDeskId, desks.length]);
 
   // ── Center image on load — verbatim from ManageDesksModal ──
   useEffect(() => {
@@ -491,14 +509,9 @@ export const RoomMapViewer: React.FC<RoomMapViewerProps> = ({ room, onClose, onB
     setBookingModalOpen(true);
   };
 
-  const handleConfirmBooking = async (startDate: string, endDate: string, startTime: string, endTime: string) => {
-    if (!bookingDesk) return;
-    await bookingApi.createBooking({
-      desk_id:    bookingDesk.id,
-      start_time: buildISO(startDate, startTime),
-      end_time:   buildISO(endDate, endTime),
-    });
-    handleCloseBookingModal();
+  const handleConfirmBooking = async (_startDate: string, _endDate: string, _startTime: string, _endTime: string) => {
+    // BookingModal now handles the createBooking API call directly for surgical
+    // calendar updates. onConfirm is only used to notify the parent to refresh.
     onBookingChange?.();
   };
 
@@ -709,7 +722,8 @@ export const RoomMapViewer: React.FC<RoomMapViewerProps> = ({ room, onClose, onB
         myUsername={user?.username}
         bookingApi={bookingApi}
         editingBooking={editingBooking}
-        onBookingUpdated={() => { handleCloseBookingModal(); onBookingChange?.(); }}
+        onBookingUpdated={() => { onBookingChange?.(); }}
+        onEditingDone={() => setEditingBooking(null)}
         onEditBooking={handleEditBooking}
         onLockFailed={(lockedBy) => {
           if (bookingDesk !== null) {

@@ -118,6 +118,49 @@ export const createBookingApi = (
     });
   },
 
+  /** Edit a booking by replacing it with one or more new intervals.
+   *  Merges overlapping/adjacent intervals automatically.
+   *  Pass an empty array to delete the booking entirely. */
+  async editIntervals(
+    bookingId: number,
+    intervals: { start_time: string; end_time: string }[]
+  ): Promise<{
+    message: string;
+    updated_id: number;
+    deleted_ids: number[];
+    created_ids: number[];
+    intervals: { start_time: string; end_time: string }[];
+  }> {
+    const response = await authenticatedFetch(
+      `${API_BASE_URL}/bookings/${bookingId}/edit_intervals/`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ intervals }),
+      }
+    );
+    return handleResponse(response);
+  },
+
+  /** Bulk-create multiple bookings for one desk in one request.
+   *  atomic=true → all-or-nothing (409 on any overlap).
+   *  atomic=false (default) → partial success, returns per-interval results. */
+  async bulkCreate(payload: {
+    desk_id: number;
+    intervals: { start_time: string; end_time: string }[];
+    atomic?: boolean;
+  }): Promise<
+    | { ok: true }                                               // atomic success
+    | { results: { start_time: string; end_time: string; ok: boolean; status: number; error?: string; conflict_days?: string[] }[] }  // partial
+  > {
+    const response = await authenticatedFetch(`${API_BASE_URL}/bookings/bulk_create/`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    return handleResponse(response);
+  },
+
   /** Refresh lock TTL while user is on the booking form */
   async refreshLock(deskId: number): Promise<{ ok: boolean }> {
     const response = await authenticatedFetch(`${API_BASE_URL}/bookings/refresh_lock/`, {

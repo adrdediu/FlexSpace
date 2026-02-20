@@ -15,6 +15,7 @@ import { LocationBrowser } from './Dashboard/LocationBrowser';
 import { TodayPanel } from './Dashboard/TodayPanel';
 import { BookingsCalendar } from './Dashboard/BookingsCalendar';
 import { type RoomWithDesks } from '../services/roomApi';
+import { type Booking } from '../services/bookingApi';
 
 const useStyles = makeStyles({
   container: {
@@ -223,6 +224,9 @@ const Home: React.FC<HomeProps> = ({ onMount }) => {
   const [selectedRoomData, setSelectedRoomData] = useState<RoomWithDesks | null>(null);
   const [loadingRoom, setLoadingRoom] = useState(false);
   const [bookingRefreshToken, setBookingRefreshToken] = useState(0);
+  // Set when navigating from TodayPanel — passed to RoomMapViewer to auto-highlight/edit
+  const [pendingDeskId, setPendingDeskId] = useState<number | null>(null);
+  const [pendingEditBooking, setPendingEditBooking] = useState<Booking | null>(null);
 
   const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000/api';
 
@@ -246,6 +250,20 @@ const Home: React.FC<HomeProps> = ({ onMount }) => {
     setBookingRefreshToken(t => t + 1);
   }, []);
 
+  // Navigate from TodayPanel booking card → open the room and highlight the desk
+  const handleTodayBookingClick = useCallback(async (booking: Booking) => {
+    setPendingDeskId(booking.desk.id);
+    setPendingEditBooking(null);
+    await handleRoomSelect(booking.desk.room);
+  }, [handleRoomSelect]);
+
+  // Navigate from TodayPanel edit button → open room, highlight desk, open edit modal
+  const handleTodayBookingEdit = useCallback(async (booking: Booking) => {
+    setPendingDeskId(booking.desk.id);
+    setPendingEditBooking(booking);
+    await handleRoomSelect(booking.desk.room);
+  }, [handleRoomSelect]);
+
   const renderDashboard = () => (
     <FloatingPanelGrid>
 
@@ -260,6 +278,8 @@ const Home: React.FC<HomeProps> = ({ onMount }) => {
         <TodayPanel
           refreshToken={bookingRefreshToken}
           onBookingCancelled={handleBookingChange}
+          onBookingClick={handleTodayBookingClick}
+          onBookingEdit={handleTodayBookingEdit}
         />
       </FloatingPanel>
 
@@ -286,8 +306,10 @@ const Home: React.FC<HomeProps> = ({ onMount }) => {
         ) : selectedRoomData ? (
           <RoomMapViewer
             room={selectedRoomData}
-            onClose={() => setSelectedRoomData(null)}
+            onClose={() => { setSelectedRoomData(null); setPendingDeskId(null); setPendingEditBooking(null); }}
             onBookingChange={handleBookingChange}
+            initialSelectedDeskId={pendingDeskId}
+            initialEditingBooking={pendingEditBooking}
           />
         ) : (
           <div style={{

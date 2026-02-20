@@ -99,13 +99,19 @@ const useStyles = makeStyles({
     transition: 'all 0.12s ease',
     ':hover': {
       backgroundColor: tokens.colorNeutralBackground1Hover,
-      borderColor: tokens.colorNeutralStroke1,
+      borderTopColor: tokens.colorNeutralStroke1,
+      borderRightColor: tokens.colorNeutralStroke1,
+      borderBottomColor: tokens.colorNeutralStroke1,
+      borderLeftColor: tokens.colorNeutralStroke1,
       boxShadow: tokens.shadow4,
     },
   },
   cardActive: {
     backgroundColor: tokens.colorBrandBackground2,
-    borderColor: tokens.colorBrandStroke1,
+    borderTopColor: tokens.colorBrandStroke1,
+    borderRightColor: tokens.colorBrandStroke1,
+    borderBottomColor: tokens.colorBrandStroke1,
+    borderLeftColor: tokens.colorBrandStroke1,
     ':hover': {
       backgroundColor: tokens.colorBrandBackground2Hover,
     },

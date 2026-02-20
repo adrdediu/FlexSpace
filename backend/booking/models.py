@@ -242,8 +242,20 @@ class Booking(models.Model):
         from django.utils import timezone as _tz
         now = _tz.now()
 
+        # On updates, allow keeping the original start even if it's now in the past.
         if self.start_time and self.start_time < now:
-            raise ValidationError({'start_time': 'Booking start time cannot be in the past.'})
+            if self.pk:
+                # Existing booking: only reject if start_time actually changed
+                try:
+                    original = Booking.objects.get(pk=self.pk)
+                    start_unchanged = abs((self.start_time - original.start_time).total_seconds()) < 60
+                    if not start_unchanged:
+                        raise ValidationError({'start_time': 'Booking start time cannot be in the past.'})
+                except Booking.DoesNotExist:
+                    raise ValidationError({'start_time': 'Booking start time cannot be in the past.'})
+            else:
+                # New booking: always enforce
+                raise ValidationError({'start_time': 'Booking start time cannot be in the past.'})
 
         if self.start_time and self.end_time and self.end_time <= self.start_time:
             raise ValidationError({'end_time': 'end_time must be after start_time.'})

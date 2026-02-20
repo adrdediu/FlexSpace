@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from 'react';
 import {
   makeStyles, tokens, Text, Button, Spinner,
-  Dialog, DialogSurface, DialogBody, DialogTitle, DialogContent,
+  Dialog, DialogSurface, DialogBody, DialogContent,
 } from '@fluentui/react-components';
 import {
   Dismiss24Regular, Clock20Regular, Warning20Regular,
@@ -78,6 +78,25 @@ const TZ_LABEL = (() => {
 // ─── Styles ───────────────────────────────────────────────────────────────────
 
 const useStyles = makeStyles({
+  modalHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: `${tokens.spacingVerticalM} ${tokens.spacingHorizontalL}`,
+    borderBottom: `1px solid ${tokens.colorNeutralStroke2}`,
+    flexShrink: 0,
+    gap: tokens.spacingHorizontalM,
+  },
+  modalTitle: {
+    fontSize: tokens.fontSizeBase400,
+    fontWeight: tokens.fontWeightSemibold,
+    color: tokens.colorNeutralForeground1,
+    flex: 1,
+    minWidth: 0,
+    overflow: 'hidden',
+    textOverflow: 'ellipsis',
+    whiteSpace: 'nowrap',
+  },
   surface: {
     maxWidth: '900px',
     width: '96vw',
@@ -115,11 +134,17 @@ const useStyles = makeStyles({
   },
   summaryBarActive: {
     backgroundColor: tokens.colorBrandBackground2,
-    borderColor: tokens.colorBrandStroke1,
+    borderTopColor: tokens.colorBrandStroke1,
+    borderRightColor: tokens.colorBrandStroke1,
+    borderBottomColor: tokens.colorBrandStroke1,
+    borderLeftColor: tokens.colorBrandStroke1,
   },
   summaryBarPicking: {
     backgroundColor: tokens.colorPaletteTealBackground2,
-    borderColor: tokens.colorPaletteTealBorderActive,
+    borderTopColor: tokens.colorPaletteTealBorderActive,
+    borderRightColor: tokens.colorPaletteTealBorderActive,
+    borderBottomColor: tokens.colorPaletteTealBorderActive,
+    borderLeftColor: tokens.colorPaletteTealBorderActive,
   },
   deskChip: {
     display: 'flex',
@@ -266,7 +291,10 @@ const useStyles = makeStyles({
     color: tokens.colorBrandForeground1,
     fontWeight: tokens.fontWeightSemibold,
     backgroundColor: tokens.colorBrandBackground2,
-    borderColor: tokens.colorBrandStroke1,
+    borderTopColor: tokens.colorBrandStroke1,
+    borderRightColor: tokens.colorBrandStroke1,
+    borderBottomColor: tokens.colorBrandStroke1,
+    borderLeftColor: tokens.colorBrandStroke1,
   },
   stepDone: {
     color: tokens.colorNeutralForeground2,
@@ -330,6 +358,8 @@ export interface BookingModalProps {
   editingBooking?: Booking | null;
   onBookingUpdated?: () => void;
   onEditBooking?: (b: Booking) => void;
+  /** Called when the edit session ends (save, cancel, or close) so parent can clear editingBooking */
+  onEditingDone?: () => void;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -337,7 +367,7 @@ export interface BookingModalProps {
 export const BookingModal: React.FC<BookingModalProps> = ({
   open, desk, roomName, onClose, onConfirm,
   myUsername, bookingApi, onLockFailed,
-  editingBooking, onBookingUpdated, onEditBooking,
+  editingBooking, onBookingUpdated, onEditBooking, onEditingDone,
 }) => {
   const styles = useStyles();
 
@@ -362,6 +392,14 @@ export const BookingModal: React.FC<BookingModalProps> = ({
   // ── Desk bookings ──
   const [deskBookings, setDeskBookings] = useState<Booking[]>([]);
   const [loadingCal, setLoadingCal] = useState(false);
+  // ── Shorten mode: track which existing booking the user is shortening ──
+  // (separate from editingBooking which is the prop for the "Edit" flow)
+  const shortenBookingRef = useRef<Booking | null>(null);
+  // State mirror so CalendarGrid re-renders with pointerEvents:none on the shortening block
+  const [shortenBookingId, setShortenBookingId] = useState<number | null>(null);
+  // True once both endpoints are picked — restores pointer-events on the block so the
+  // user cannot click through it to create a new booking on top of the existing one.
+  const [selectionPicked, setSelectionPicked] = useState(false);
 
   // ── Save state ──
   const [saving, setSaving] = useState(false);
@@ -504,50 +542,50 @@ export const BookingModal: React.FC<BookingModalProps> = ({
 
   // ── Calendar click-click interaction handler ──
   const handleCalInteract = useCallback((sel: CalendarInteraction) => {
-    // Bug 1 (second layer): reject any interaction entirely in the past
     const clickedDt = new Date(`${sel.startDate}T${sel.startTime}:00`);
-    if (clickedDt < new Date()) return;
+    const now = new Date();
+
+    // Allow past-time clicks when the user is editing/shortening an existing booking
+    // (clicking inside their own block to set a new end time that may be in the past).
+    const isEditOrShorten = !!(editingBooking || shortenBookingRef.current);
+    if (clickedDt < now && !isEditOrShorten) return;
 
     if (calView === 'month') {
-      // Month: CalendarGrid already manages two-click day range internally
       setStartDate(sel.startDate);
       setEndDate(sel.endDate);
       setStartTime('09:00');
       setEndTime('17:00');
       setStep(0);
+      setSelectionPicked(true);
       setHoverTime(null); setHoverDateState(null);
       return;
     }
 
-    // Day / Week: click-click step logic
-    // onInteract fires with startDate=endDate=clicked date, startTime=endTime=clicked time (single point)
     const clickedDate = sel.startDate;
     const clickedTime = sel.startTime;
 
+    // ── Two-step click logic ──
+    // (Own-booking clicks go through handleOwnBookingClick which sets up step=1,
+    //  then the user clicks a second time to pick the new end — handled below.)
     if (step === 0) {
-      // First click: set start, advance to step 1
       setStartDate(clickedDate);
       setStartTime(clickedTime);
       setEndDate(null);
       setEndTime(null);
       setStep(1);
     } else {
-      // Second click: determine end
       if (!startDate || !startTime) { setStep(0); return; }
 
       const startDt = new Date(`${startDate}T${startTime}:00`);
-      const clickDt = new Date(`${clickedDate}T${clickedTime}:00`);
 
       let finalStartDate = startDate, finalStartTime = startTime;
       let finalEndDate = clickedDate, finalEndTime = clickedTime;
 
-      // If user clicked before the start, swap
-      if (clickDt < startDt) {
+      if (clickedDt < startDt) {
         finalStartDate = clickedDate; finalStartTime = clickedTime;
         finalEndDate = startDate; finalEndTime = startTime;
       }
 
-      // Same time clicked — enforce 30 min minimum
       if (finalStartDate === finalEndDate && finalStartTime === finalEndTime) {
         const bumped = new Date(`${finalEndDate}T${finalEndTime}:00`);
         bumped.setMinutes(bumped.getMinutes() + 30);
@@ -556,11 +594,35 @@ export const BookingModal: React.FC<BookingModalProps> = ({
       }
 
       setStartDate(finalStartDate); setStartTime(finalStartTime);
-      setEndDate(finalEndDate); setEndTime(finalEndTime);
+      setEndDate(finalEndDate);     setEndTime(finalEndTime);
       setStep(0);
+      setSelectionPicked(true);
       setHoverTime(null); setHoverDateState(null);
     }
   }, [calView, step, startDate, startTime]);
+
+  // ── Own-booking shortening: user clicked their booking block in the calendar ──
+  // Pre-fill start from the booking's current start, enter step 1 so next click sets the new end.
+  const handleOwnBookingClick = useCallback((booking: Booking) => {
+    // Enter (or restart) edit mode for this booking.
+    // The original block becomes a transparent ghost; the user picks a completely
+    // new interval via two clicks anywhere — start then end. Clicking before the
+    // original start extends it; clicking after the end extends it the other way.
+    // The existing two-step handleCalInteract logic handles all of this unchanged.
+    shortenBookingRef.current = booking;
+    setShortenBookingId(booking.id);
+    setSelectionPicked(false);
+    // Full reset — user picks new start then new end freely
+    setStartDate(null); setStartTime(null);
+    setEndDate(null);   setEndTime(null);
+    setStep(0);
+    setHoverTime(null); setHoverDateState(null);
+    setError(null);
+    // Navigate calendar so the booking is visible
+    const start = new Date(booking.start_time);
+    if (calView === 'week') setCalAnchor(calStartOfWeek(calStartOfDay(start)));
+    if (calView === 'day')  setCalAnchor(calStartOfDay(start));
+  }, [calView]);
 
   // ── Draft slots shown in calendar ──
   const drafts: DraftSlot[] = useMemo(() => {
@@ -696,15 +758,53 @@ export const BookingModal: React.FC<BookingModalProps> = ({
     if (!desk || !isValid || !startDate || !startTime || !endDate || !endTime) return;
     setSaving(true); setError(null);
     try {
-      if (editingBooking) {
-        await bookingApi.updateBooking(editingBooking.id, {
+      const shortenTarget = shortenBookingRef.current;
+      if (shortenTarget) {
+        // Shorten an existing booking via edit_intervals (handles merging + partial deletes)
+        const shortenResult = await bookingApi.editIntervals(shortenTarget.id, [{
+          start_time: new Date(`${startDate}T${startTime}:00`).toISOString(),
+          end_time:   new Date(`${endDate}T${endTime}:00`).toISOString(),
+        }]);
+        // Surgical update: swap old booking for updated one(s) in the calendar
+        setDeskBookings(prev => {
+          const removed = prev.filter(b =>
+            b.id !== shortenTarget.id && !shortenResult.deleted_ids?.includes(b.id)
+          );
+          const updated = shortenResult.intervals?.map((iv, i) => ({
+            ...shortenTarget,
+            id: i === 0 ? shortenResult.updated_id : (shortenResult.created_ids?.[i - 1] ?? shortenTarget.id),
+            start_time: iv.start_time,
+            end_time: iv.end_time,
+          })) ?? [];
+          return [...removed, ...updated];
+        });
+        shortenBookingRef.current = null;
+        setShortenBookingId(null);
+        onBookingUpdated?.();
+        onEditingDone?.();
+        handleFullReset();
+      } else if (editingBooking) {
+        // Full edit via PATCH (launched from the "Edit booking" popup in My Bookings)
+        const updatedBooking = await bookingApi.updateBooking(editingBooking.id, {
           start_time: new Date(`${startDate}T${startTime}:00`).toISOString(),
           end_time:   new Date(`${endDate}T${endTime}:00`).toISOString(),
         });
+        // Surgical update: replace booking in calendar without re-fetching
+        setDeskBookings(prev => prev.map(b => b.id === updatedBooking.id ? updatedBooking : b));
         onBookingUpdated?.();
-        onClose();
+        onEditingDone?.();
+        handleFullReset();
       } else {
+        const newBooking = await bookingApi.createBooking({
+          desk_id: desk.id,
+          start_time: new Date(`${startDate}T${startTime}:00`).toISOString(),
+          end_time:   new Date(`${endDate}T${endTime}:00`).toISOString(),
+        });
+        // Surgical insert — append the new booking to the calendar immediately
+        setDeskBookings(prev => [...prev, newBooking]);
+        // Also notify the parent (map refresh, etc.)
         await onConfirm(startDate, endDate, startTime, endTime);
+        handleFullReset();
       }
     } catch (err: any) {
       setError(err.message || 'Failed to save booking.');
@@ -713,11 +813,40 @@ export const BookingModal: React.FC<BookingModalProps> = ({
     }
   };
 
-  const handleClearSelection = () => {
+  // Hard reset — always wipes all state regardless of editingBooking.
+  // Used after a successful save so the modal is clean for the next booking.
+  const handleFullReset = () => {
+    shortenBookingRef.current = null;
+    setShortenBookingId(null);
+    setSelectionPicked(false);
     setStartDate(null); setStartTime(null);
     setEndDate(null); setEndTime(null);
-    setStep(0); setHoverTime(null); setHoverDateState(null);
+    setStep(0);
+    setHoverTime(null); setHoverDateState(null);
     setError(null);
+  };
+
+  const handleClearSelection = () => {
+    // Always clear shorten state
+    shortenBookingRef.current = null;
+    setShortenBookingId(null);
+    setSelectionPicked(false);
+    setHoverTime(null); setHoverDateState(null);
+    setError(null);
+
+    if (editingBooking) {
+      // Cancelling out of edit mode — notify parent to clear editingBooking,
+      // then reset fully so the modal returns to normal booking mode
+      onEditingDone?.();
+      setStartDate(null); setStartTime(null);
+      setEndDate(null); setEndTime(null);
+      setStep(0);
+    } else {
+      // Normal booking or shorten mode: full reset
+      setStartDate(null); setStartTime(null);
+      setEndDate(null); setEndTime(null);
+      setStep(0);
+    }
   };
 
   if (!desk) return null;
@@ -726,25 +855,34 @@ export const BookingModal: React.FC<BookingModalProps> = ({
   const isPicking = step === 1 && calView !== 'month';
 
   // ── Step labels per view ──
+  const isBlockEditMode = !!shortenBookingRef.current;
   const stepLabels = editingBooking
     ? calView === 'month'
       ? ['Start (fixed)', 'Click new end day']
       : ['Start (fixed)', 'Click new end time']
-    : calView === 'month'
-      ? ['Click start day', 'Click end day']
-      : ['Click start time', 'Click end time'];
+    : isBlockEditMode
+      ? calView === 'month'
+        ? ['Click new start day', 'Click new end day']
+        : ['Click new start time', 'Click new end time']
+      : calView === 'month'
+        ? ['Click start day', 'Click end day']
+        : ['Click start time', 'Click end time'];
 
   return (
-    <Dialog open={open} onOpenChange={(_, d) => !d.open && !saving && onClose()}>
+    <Dialog open={open}>
       <DialogSurface className={styles.surface}>
         <DialogBody className={styles.body}>
-          <DialogTitle
-            action={
-              <Button appearance="subtle" icon={<Dismiss24Regular />} onClick={onClose} disabled={saving} />
-            }
-          >
-            {editingBooking ? `Edit Booking — ${desk.name}` : `Book ${desk.name}`}
-          </DialogTitle>
+          {/* Custom header — Fluent DialogTitle puts the action inline with text */}
+          <div className={styles.modalHeader}>
+            <div className={styles.modalTitle}>
+              {shortenBookingRef.current
+                ? `Edit Booking — ${desk.name}`
+                : editingBooking
+                  ? `Edit Booking — ${desk.name}`
+                  : `Book ${desk.name}`}
+            </div>
+            <Button appearance="subtle" icon={<Dismiss24Regular />} onClick={() => { onEditingDone?.(); onClose(); }} disabled={saving} />
+          </div>
 
           <DialogContent className={styles.content}>
 
@@ -763,7 +901,9 @@ export const BookingModal: React.FC<BookingModalProps> = ({
               <div className={styles.summaryRange}>
                 {!startDate ? (
                   <span className={styles.summaryPlaceholder}>
-                    {calView === 'month' ? 'Click a day to start' : 'Click a time to start'}
+                    {isBlockEditMode
+                      ? (calView === 'month' ? 'Click new start day' : 'Click new start time')
+                      : (calView === 'month' ? 'Click a day to start' : 'Click a time to start')}
                   </span>
                 ) : isPicking ? (
                   <>
@@ -774,7 +914,11 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                       </span>
                     </div>
                     <span className={styles.summaryPickingHint}>
-                      {editingBooking ? '→ click new end time' : '→ now click end time'}
+                      {editingBooking
+                        ? '→ click new end time'
+                        : isBlockEditMode
+                          ? '→ now click new end time'
+                          : '→ now click end time'}
                     </span>
                   </>
                 ) : endDate ? (
@@ -816,7 +960,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                     Clear
                   </Button>
                 )}
-                <Button appearance="secondary" size="small" onClick={onClose} disabled={saving}>
+                <Button appearance="secondary" size="small" onClick={handleClearSelection} disabled={saving}>
                   Cancel
                 </Button>
                 <Button
@@ -826,7 +970,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                   onClick={handleConfirm}
                   disabled={saving || !isValid}
                 >
-                  {editingBooking ? 'Save Changes' : 'Book'}
+                  {shortenBookingRef.current || editingBooking ? 'Save Changes' : 'Book'}
                 </Button>
               </div>
             </div>
@@ -900,7 +1044,9 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                     onInteract={handleCalInteract}
                     calColDateAttr={calView !== 'month' ? calDays.map(d => calDateStr(d)) : undefined}
                     onEditBooking={onEditBooking}
-                    editingBookingId={editingBooking?.id ?? null}
+                    editingBookingId={shortenBookingId ?? editingBooking?.id ?? null}
+                    clickLocked={selectionPicked && !!(shortenBookingId != null || editingBooking != null)}
+                    onOwnBookingClick={calView !== 'month' ? handleOwnBookingClick : undefined}
                   />
                 </div>
               )}
