@@ -2,7 +2,7 @@ from django.conf import settings
 from django.forms import ValidationError
 from django.db import transaction
 from typing import Optional
-from datetime import datetime, timezone as dt_timezone
+from datetime import timedelta, timezone as dt_timezone
 from django.utils import timezone
 from django_filters.rest_framework import DjangoFilterBackend
 from django.utils.timezone import is_naive
@@ -74,8 +74,8 @@ class RoomViewSet(viewsets.ModelViewSet):
         room = self.get_object()
 
         try:
-            start_date = datetime.strptime(
-                request.query_params.get('start', datetime.today().strftime("%Y-%m-%d")),
+            start_date = datetime.datetime.strptime(
+                request.query_params.get('start', datetime.datetime.today().strftime("%Y-%m-%d")),
                 "%Y-%m-%d"
             ).date()
         except ValueError:
@@ -86,7 +86,7 @@ class RoomViewSet(viewsets.ModelViewSet):
         except ValueError:
             return Response({"error": "days must be integer"}, status = 400)
         
-        end_date = start_date + time_delta(days=days - 1)
+        end_date = start_date + timedelta(days=days - 1)
 
         desks = Desk.objects.filter(room=room)
 
@@ -219,8 +219,8 @@ class DeskViewSet(viewsets.ModelViewSet):
         desk = self.get_object()
 
         try:
-            start_date = datetime.strptime(
-                request.query_params.get('start', datetime.today().strftime("%Y-%m-%d")),
+            start_date = datetime.datetime.strptime(
+                request.query_params.get('start', datetime.datetime.today().strftime("%Y-%m-%d")),
                 "%Y-%m-%d"
             ).date()
         except ValueError:
@@ -231,7 +231,7 @@ class DeskViewSet(viewsets.ModelViewSet):
         except ValueError:
             return Response({"error": "days must be integer"}, status = 400)
         
-        end_date = start_date + time_delta(days=days - 1)
+        end_date = start_date + timedelta(days=days - 1)
 
         bookings = Booking.objects.filter(
             desk = desk,
@@ -241,7 +241,7 @@ class DeskViewSet(viewsets.ModelViewSet):
 
         availability = {}
         for i in range(days):
-            current_day = start_date + datetime.timedelta(days=i)
+            current_day = start_date + timedelta(days=i)
             booked = bookings.filter(
                 start_time__date__lte=current_day,
                 end_time__date__gte=current_day
@@ -374,16 +374,20 @@ class BookingViewSet(viewsets.ModelViewSet):
     def unlock(self, request):
         desk_id = int(request.data.get("desk_id"))
         ok = release_lock(desk_id, request.user.id)
-        if ok:
-            Desk.objects.filter(pk=desk_id).update(is_locked=False,locked_by=None)
+        if not ok:
+            # Lock exists and is owned by a different user — refuse
+            return Response({"ok": False}, status=409)
+        # Always clean up DB and broadcast, whether the Redis lock existed or had
+        # already expired (TTL elapsed, server restart, or sendBeacon race).
+        desk = Desk.objects.get(pk=desk_id)
+        if desk.is_locked:
+            Desk.objects.filter(pk=desk_id).update(is_locked=False, locked_by=None)
             channel_layer = get_channel_layer()
-            desk = Desk.objects.get(pk=desk_id)
             async_to_sync(channel_layer.group_send)(
                 f"room_{desk.room_id}",
-                {"type":"desk_lock", "desk_id":desk_id, "locked":False}
+                {"type": "desk_lock", "desk_id": desk_id, "locked": False}
             )
-            return Response({"ok":True}, status=200)
-        return Response({"ok":False},status=409)
+        return Response({"ok": True}, status=200)
     
     @transaction.atomic
     def perform_create(self,serializer):
@@ -517,7 +521,7 @@ class BookingViewSet(viewsets.ModelViewSet):
                 cur = start_day
                 while cur <= end_day:
                     days.add(cur.isoformat())
-                    cur = cur + datetime.timedelta(days=1)
+                    cur = cur + timedelta(days=1)
             return sorted(list(days))
         
         if atomic:

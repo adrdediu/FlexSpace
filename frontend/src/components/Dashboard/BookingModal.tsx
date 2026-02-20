@@ -412,12 +412,18 @@ export const BookingModal: React.FC<BookingModalProps> = ({
   useEffect(() => {
     if (!open || !desk) return;
     let cancelled = false;
-    bookingApi.lockDesk(desk.id).then(result => {
-      if (cancelled) return;
+    const deskId = desk.id;
+    bookingApi.lockDesk(deskId).then(result => {
+      if (cancelled) {
+        // Component unmounted before the lock request resolved —
+        // release immediately so the desk is not stranded locked.
+        if (result.ok) bookingApi.unlockDesk(deskId).catch(() => {});
+        return;
+      }
       if (result.ok) {
-        lockedDeskIdRef.current = desk.id;
+        lockedDeskIdRef.current = deskId;
         lockRefreshRef.current = setInterval(
-          () => bookingApi.refreshLock(desk.id).catch(() => {}), 25_000
+          () => bookingApi.refreshLock(deskId).catch(() => {}), 25_000
         );
       } else {
         onLockFailed?.(result.locked_by ?? null);

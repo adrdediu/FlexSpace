@@ -39,7 +39,7 @@ def acquire_lock(desk_id: int, user_id: int, username: str) -> bool:
         return True
     
     data = _load(conn,key)
-    if data and data.get("user.id") == user_id:
+    if data and data.get("user_id") == user_id:
         # Refresh TTL for same Owner
         conn.psetex(key,LOCK_TTL_MS,json.dumps({**data, "refreshed_at": now_utc().isoformat()}))
         return True
