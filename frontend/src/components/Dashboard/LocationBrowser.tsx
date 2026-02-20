@@ -127,16 +127,28 @@ const useStyles = makeStyles({
     fontSize: '16px',
   },
   cardIconLocation: {
-    backgroundColor: tokens.colorBrandBackground2,
-    color: tokens.colorBrandForeground1,
+    backgroundColor: tokens.colorBrandBackground,
+    color: tokens.colorNeutralForegroundOnBrand,
+  },
+  cardIconLocationActive: {
+    backgroundColor: tokens.colorNeutralForegroundOnBrand,
+    color: tokens.colorBrandBackground,
   },
   cardIconRoom: {
     backgroundColor: tokens.colorNeutralBackground3,
     color: tokens.colorNeutralForeground2,
   },
+  cardIconRoomActive: {
+    backgroundColor: tokens.colorNeutralForegroundOnBrand,
+    color: tokens.colorBrandBackground,
+  },
   cardIconRoomAvailable: {
-    backgroundColor: tokens.colorPaletteGreenBackground1,
-    color: tokens.colorPaletteGreenForeground1,
+    backgroundColor: tokens.colorPaletteGreenBackground3,
+    color: tokens.colorNeutralForegroundOnBrand,
+  },
+  cardIconRoomAvailableActive: {
+    backgroundColor: tokens.colorNeutralForegroundOnBrand,
+    color: tokens.colorPaletteGreenForeground3,
   },
   cardBody: {
     flex: 1,
@@ -456,7 +468,7 @@ export const LocationBrowser: React.FC<LocationBrowserProps> = ({
                   onClick={() => room.can_book && !room.is_under_maintenance && onRoomSelect(room.id)}
                   style={{ cursor: (!room.can_book || room.is_under_maintenance) ? 'default' : 'pointer' }}
                 >
-                  <div className={`${styles.cardIcon} ${hasAvailable ? styles.cardIconRoomAvailable : styles.cardIconRoom}`}>
+                  <div className={`${styles.cardIcon} ${isActive ? (hasAvailable ? styles.cardIconRoomAvailableActive : styles.cardIconRoomActive) : (hasAvailable ? styles.cardIconRoomAvailable : styles.cardIconRoom)}`}>
                     <DoorRegular />
                   </div>
                   <div className={styles.cardBody}>
@@ -468,7 +480,9 @@ export const LocationBrowser: React.FC<LocationBrowserProps> = ({
                             {room.maintenance_by_name && ` · issued by ${room.maintenance_by_name}`}
                             {'. Please contact them.'}
                           </>
-                        : `${room.available_desk_count} of ${room.desk_count} available`
+                        : (room.desk_count != null
+                            ? `${room.available_desk_count ?? 0} of ${room.desk_count} desks available`
+                            : 'Loading…')
                       }
                     </div>
                   </div>

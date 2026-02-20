@@ -239,7 +239,8 @@ function markerTitle(desk: DeskLiveState, myUserId?: number): string {
   return `${desk.name} — available`;
 }
 
-function canBook(desk: DeskLiveState, myUserId?: number): boolean {
+function canBook(desk: DeskLiveState, myUserId?: number, roomCanBook: boolean = true): boolean {
+  if (!roomCanBook) return false;
   if (desk.is_locked && desk.locked_by_id !== myUserId) return false;
   if (desk.is_permanent && desk.permanent_assignee && desk.permanent_assignee !== myUserId) return false;
   return true;
@@ -566,6 +567,21 @@ export const RoomMapViewer: React.FC<RoomMapViewerProps> = ({ room, onClose, onB
       </div>
 
       {/* Maintenance banner */}
+      {!room.can_book && !isMaintenance && (
+        <div style={{
+          display: 'flex', alignItems: 'center', gap: tokens.spacingHorizontalS,
+          padding: `${tokens.spacingVerticalXS} ${tokens.spacingHorizontalM}`,
+          backgroundColor: tokens.colorPaletteRedBackground1,
+          border: `1px solid ${tokens.colorPaletteRedBorder1}`,
+          borderRadius: tokens.borderRadiusMedium,
+          fontSize: tokens.fontSizeBase200,
+          color: tokens.colorPaletteRedForeground1,
+          flexShrink: 0,
+        }}>
+          <LockClosed20Filled style={{ flexShrink: 0, fontSize: '14px' }} />
+          <span>You are not in an allowed group for this room. Bookings are restricted.</span>
+        </div>
+      )}
       {isMaintenance && (
         <div className={styles.maintenanceBanner}>
           <Warning20Regular style={{ flexShrink: 0 }} />
@@ -635,7 +651,7 @@ export const RoomMapViewer: React.FC<RoomMapViewerProps> = ({ room, onClose, onB
 
                 {desksWithPos.map(desk => {
                   const isSelected = selectedDeskId === desk.id;
-                  const bookable   = canBook(desk, myUserId) && !isMaintenance;
+                  const bookable   = canBook(desk, myUserId, room.can_book) && !isMaintenance;
                   const color      = markerColor(desk, isSelected, myUserId);
 
                   return (
@@ -694,7 +710,9 @@ export const RoomMapViewer: React.FC<RoomMapViewerProps> = ({ room, onClose, onB
                               </MenuItem>
                             ) : (
                               <MenuItem icon={<CalendarCancel20Regular />} disabled>
-                                {desk.is_locked
+                                {!room.can_book
+                                  ? 'Access restricted'
+                                  : desk.is_locked
                                   ? `Locked by ${desk.locked_by ?? 'someone'}`
                                   : desk.is_permanent ? 'Permanently assigned'
                                   : 'Unavailable'}

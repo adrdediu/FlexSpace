@@ -27,7 +27,7 @@ from .serializers.desk import DeskSerializer
 from .serializers.booking import BookingSerializer
 from .serializers.floor import FloorSerializer
 from .serializers.location import LocationSerializer
-from .serializers.room import RoomSerializer, RoomWithDesksSerializer
+from .serializers.room import RoomSerializer, RoomListSerializer, RoomWithDesksSerializer
 
 import datetime
 
@@ -56,6 +56,11 @@ class RoomViewSet(viewsets.ModelViewSet):
     permission_classes = [permissions.IsAuthenticated]
     filter_backends = [DjangoFilterBackend]
     filterset_fields = ['floor']
+
+    def get_serializer_class(self):
+        if self.action == 'list':
+            return RoomListSerializer
+        return RoomSerializer
 
     @action(detail=True, methods=['get'])
     def desks(self, request, pk=None):
@@ -399,7 +404,12 @@ class BookingViewSet(viewsets.ModelViewSet):
         lock = read_lock(desk_id)
         if lock and lock.get("user_id") != self.request.user.id:
             raise ValidationError({"detail": "Desk currently locked by another user."})
-        
+
+        # Enforce room-level group access
+        desk_room = Desk.objects.select_related('room__floor__location').get(pk=desk_id).room
+        if not desk_room.can_user_book(self.request.user):
+            raise ValidationError({"detail": "You do not have permission to book desks in this room."})
+
         start_dt = datetime.datetime.fromisoformat(self.request.data["start_time"].replace('Z','+00:00'))
         end_dt = datetime.datetime.fromisoformat(self.request.data["end_time"].replace('Z','+00:00'))
 
@@ -471,7 +481,11 @@ class BookingViewSet(viewsets.ModelViewSet):
         """
 
         desk_id = request.data.get("desk_id")
-        desk_locked = Desk.objects.select_for_update().get(pk=desk_id)
+        desk_locked = Desk.objects.select_for_update().select_related('room__floor__location').get(pk=desk_id)
+
+        # Enforce room-level group access
+        if not desk_locked.room.can_user_book(request.user):
+            return Response({"detail": "You do not have permission to book desks in this room."}, status=403)
 
         if desk_locked.is_permanent:
             if not desk_locked.permanent_assignee:
@@ -673,6 +687,11 @@ class BookingViewSet(viewsets.ModelViewSet):
 
         if base_booking.user != user:
             return Response({"detail": "You can only edit your own bookings"}, status=403)
+
+        # Enforce room-level group access (user must still have access to modify bookings here)
+        desk_room = desk.room if hasattr(desk, 'room') else Desk.objects.select_related('room__floor__location').get(pk=desk.pk).room
+        if not desk_room.can_user_book(user):
+            return Response({"detail": "You do not have permission to book desks in this room."}, status=403)
         
         payload = request.data.get("intervals", [])
         if not isinstance(payload, list):
