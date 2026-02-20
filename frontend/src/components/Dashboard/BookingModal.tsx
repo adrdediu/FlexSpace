@@ -10,6 +10,7 @@ import {
   CheckmarkCircle20Regular,
 } from '@fluentui/react-icons';
 import { createBookingApi, type Booking } from '../../services/bookingApi';
+import { usePreferences } from '../../contexts/PreferencesContext';
 import {
   CalendarGrid, type DraftSlot, type CalendarInteraction,
   calStartOfDay, calStartOfWeek, calAddDays, calStartOfMonth,
@@ -28,12 +29,7 @@ function dateToDateStr(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-function fmtTime(t: string): string {
-  const [h, m] = t.split(':').map(Number);
-  const period = h >= 12 ? 'PM' : 'AM';
-  const h12 = h % 12 || 12;
-  return `${h12}:${String(m).padStart(2, '0')} ${period}`;
-}
+// fmtTime is now replaced by usePreferences().formatTime — see component body
 
 function fmtDate(d: string): string {
   return dateStrToDate(d).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
@@ -370,6 +366,14 @@ export const BookingModal: React.FC<BookingModalProps> = ({
   editingBooking, onBookingUpdated, onEditBooking, onEditingDone,
 }) => {
   const styles = useStyles();
+  const { formatTime } = usePreferences();
+  // fmtTime: format an HH:MM string using the user's time_format preference
+  const fmtTime = (t: string) => {
+    const [h, m] = t.split(':').map(Number);
+    const d = new Date();
+    d.setHours(h, m, 0, 0);
+    return formatTime(d);
+  };
 
   // ── Booking range state ──
   const [startDate, setStartDate] = useState<string | null>(null);
@@ -404,6 +408,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
   // ── Save state ──
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [cancellingId, setCancellingId] = useState<number | null>(null);
 
   // ── Lock ──
   const lockRefreshRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -554,13 +559,17 @@ export const BookingModal: React.FC<BookingModalProps> = ({
     // Allow past-time clicks when the user is editing/shortening an existing booking
     // (clicking inside their own block to set a new end time that may be in the past).
     const isEditOrShorten = !!(editingBooking || shortenBookingRef.current);
-    if (clickedDt < now && !isEditOrShorten) return;
+    // Month view: startTime is already snapped to the next 30-min boundary for today
+    // by CalendarGrid, so we skip the past-time guard here to avoid false rejections.
+    if (calView !== 'month' && clickedDt < now && !isEditOrShorten) return;
 
     if (calView === 'month') {
       setStartDate(sel.startDate);
       setEndDate(sel.endDate);
-      setStartTime('09:00');
-      setEndTime('17:00');
+      // Use the snapped startTime from CalendarGrid (already adjusted to current time
+      // when start date is today), fall back to '00:00' only for future dates.
+      setStartTime(sel.startTime);
+      setEndTime('23:59');
       setStep(0);
       setSelectionPicked(true);
       setHoverTime(null); setHoverDateState(null);
@@ -759,6 +768,21 @@ export const BookingModal: React.FC<BookingModalProps> = ({
     ? durationLabel(startDate, startTime, endDate, endTime)
     : null;
 
+  // ── Cancel existing booking from month view ──
+  const handleCancelBooking = useCallback(async (booking: Booking) => {
+    if (!confirm(`Cancel booking for ${booking.desk.name}?`)) return;
+    setCancellingId(booking.id);
+    try {
+      await bookingApi.cancelBooking(booking.id);
+      setDeskBookings(prev => prev.filter(b => b.id !== booking.id));
+      onBookingUpdated?.();
+    } catch (err: any) {
+      setError(err.message || 'Failed to cancel booking.');
+    } finally {
+      setCancellingId(null);
+    }
+  }, [bookingApi, onBookingUpdated]);
+
   // ── Confirm ──
   const handleConfirm = async () => {
     if (!desk || !isValid || !startDate || !startTime || !endDate || !endTime) return;
@@ -932,14 +956,14 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                     <div className={styles.summaryDateBlock}>
                       <span className={styles.summaryLabel}>Start</span>
                       <span className={styles.summaryValue}>
-                        {fmtDate(startDate)}{calView !== 'month' && startTime ? `, ${fmtTime(startTime)}` : ''}
+                        {fmtDate(startDate)}{startTime ? `, ${fmtTime(startTime)}` : ''}
                       </span>
                     </div>
                     <span className={styles.summaryArrow}>→</span>
                     <div className={styles.summaryDateBlock}>
                       <span className={styles.summaryLabel}>End</span>
                       <span className={styles.summaryValue}>
-                        {fmtDate(endDate)}{calView !== 'month' && endTime ? `, ${fmtTime(endTime)}` : ''}
+                        {fmtDate(endDate)}{endTime ? `, ${fmtTime(endTime)}` : ''}
                       </span>
                     </div>
                   </>
@@ -1053,6 +1077,8 @@ export const BookingModal: React.FC<BookingModalProps> = ({
                     editingBookingId={shortenBookingId ?? editingBooking?.id ?? null}
                     clickLocked={selectionPicked && !!(shortenBookingId != null || editingBooking != null)}
                     onOwnBookingClick={calView !== 'month' ? handleOwnBookingClick : undefined}
+                    onCancelBooking={calView === 'month' ? handleCancelBooking : undefined}
+                    cancellingId={cancellingId}
                   />
                 </div>
               )}

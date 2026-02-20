@@ -162,12 +162,6 @@ function isFuture(isoStr: string) {
   return new Date(isoStr) > new Date();
 }
 
-function formatTime(isoStr: string): string {
-  try {
-    return new Date(isoStr).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  } catch { return ''; }
-}
-
 function formatDate(isoStr: string): string {
   try {
     const d = new Date(isoStr);
@@ -205,6 +199,8 @@ export const TodayPanel: React.FC<TodayPanelProps> = ({
   const styles = useStyles();
   const { authenticatedFetch } = useAuth();
   const bookingApi = createBookingApi(authenticatedFetch);
+  const { formatTime: prefFormatTime } = usePreferences();
+  const formatTime = (iso: string) => { try { return prefFormatTime(new Date(iso)); } catch { return ''; } };
 
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
@@ -293,6 +289,7 @@ export const TodayPanel: React.FC<TodayPanelProps> = ({
                   onCancel={() => handleCancel(booking)}
                   onNavigate={onBookingClick ? () => onBookingClick(booking) : undefined}
                   onEdit={onBookingEdit ? () => onBookingEdit(booking) : undefined}
+                  formatTime={formatTime}
                 />
               ))}
             </>
@@ -313,6 +310,7 @@ export const TodayPanel: React.FC<TodayPanelProps> = ({
                   onCancel={() => handleCancel(booking)}
                   onNavigate={onBookingClick ? () => onBookingClick(booking) : undefined}
                   onEdit={onBookingEdit ? () => onBookingEdit(booking) : undefined}
+                  formatTime={formatTime}
                 />
               ))}
             </>
@@ -332,7 +330,8 @@ const BookingCard: React.FC<{
   onCancel: () => void;
   onNavigate?: () => void;
   onEdit?: () => void;
-}> = ({ booking, isToday, cancelling, onCancel, onNavigate, onEdit }) => {
+  formatTime: (iso: string) => string;
+}> = ({ booking, isToday, cancelling, onCancel, onNavigate, onEdit, formatTime }) => {
   const styles = useStyles();
 
   return (

@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback, useMemo, useRef } from 'react';
 import {
   makeStyles, tokens, Text, Button, Spinner, Tooltip,
+  Popover, PopoverTrigger, PopoverSurface,
 } from '@fluentui/react-components';
 import {
   ChevronLeft20Regular, ChevronRight20Regular,
@@ -10,6 +11,7 @@ import {
 } from '@fluentui/react-icons';
 import { createBookingApi, type Booking } from '../../services/bookingApi';
 import { useAuth } from '../../contexts/AuthContext';
+import { usePreferences } from '../../contexts/PreferencesContext';
 
 // ─── View modes ───────────────────────────────────────────────────────────────
 type ViewMode = 'day' | 'week' | 'month';
@@ -43,6 +45,11 @@ export function calDateStr(d: Date): string {
 export function calFormatTime(iso: string): string {
   try { return new Date(iso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }); }
   catch { return ''; }
+}
+/** Hook-based formatter — respects user's time_format preference. */
+function useFormatTime() {
+  const { formatTime } = usePreferences();
+  return (iso: string) => { try { return formatTime(new Date(iso)); } catch { return ''; } };
 }
 export function calFormatShortDate(d: Date): string {
   return d.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
@@ -176,44 +183,43 @@ export const useCalStyles = makeStyles({
   // ── Events ──
   eventBlock: {
     position: 'absolute', left: '3px', right: '3px',
-    borderRadius: tokens.borderRadiusSmall, padding: '2px 5px',
+    borderRadius: tokens.borderRadiusSmall, padding: '3px 6px',
     overflow: 'hidden', cursor: 'pointer',
-    backgroundColor: tokens.colorBrandBackground2,
-    borderLeft: `3px solid ${tokens.colorBrandStroke1}`,
+    backgroundColor: tokens.colorBrandBackground,
+    borderLeft: `3px solid ${tokens.colorBrandBackgroundPressed}`,
     boxSizing: 'border-box', minHeight: '18px',
     transition: 'filter 0.1s',
-    ':hover': { filter: 'brightness(0.9)' },
+    ':hover': { filter: 'brightness(0.88)' },
   },
   eventBlockOther: {
-    backgroundColor: tokens.colorPaletteRedBackground2,
-    borderLeft: `3px solid ${tokens.colorPaletteRedBorder1}`,
+    backgroundColor: tokens.colorPaletteRedBackground3,
+    borderLeft: `3px solid ${tokens.colorPaletteRedBorderActive}`,
   },
   eventBlockDraft: {
-    backgroundColor: tokens.colorPaletteTealBackground2,
-    borderLeft: `3px solid ${tokens.colorPaletteTealBorderActive}`,
-    border: `2px dashed ${tokens.colorPaletteLightTealBorderActive}`,
+    backgroundColor: tokens.colorPaletteTealBorderActive,
+    borderLeft: `3px solid ${tokens.colorPaletteTealForeground2}`,
+    border: `2px dashed ${tokens.colorPaletteTealForeground2}`,
     opacity: 0.85, cursor: 'default',
     transition: 'none',
   },
   // Own booking in BookingModal clickMode — user can click to shorten
   eventBlockOwnClickMode: {
     cursor: 'ns-resize',
-    opacity: 0.78,
-    borderLeft: `3px solid ${tokens.colorBrandStroke1}`,
-    outline: `2px dashed ${tokens.colorBrandStroke1}`,
+    opacity: 0.82,
+    outline: `2px dashed ${tokens.colorNeutralForegroundOnBrand}`,
     outlineOffset: '-3px',
-    ':hover': { opacity: 1, filter: 'brightness(1.06)' },
+    ':hover': { opacity: 1, filter: 'brightness(0.92)' },
   },
   // Another user's booking in BookingModal clickMode — blocks the click
   eventBlockBlocked: {
     cursor: 'not-allowed',
-    opacity: 0.65,
+    opacity: 0.75,
   },
-  eventTitle:      { fontSize: '11px', fontWeight: tokens.fontWeightSemibold, color: tokens.colorBrandForeground1, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: '1.3' },
-  eventTitleOther: { color: tokens.colorPaletteRedForeground1 },
-  eventTitleDraft: { color: tokens.colorPaletteTealForeground2 },
-  eventMeta:       { fontSize: '10px', color: tokens.colorBrandForeground2, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: '1.3' },
-  eventMetaOther:  { color: tokens.colorPaletteRedForeground3 },
+  eventTitle:      { fontSize: '11px', fontWeight: tokens.fontWeightSemibold, color: tokens.colorNeutralForegroundOnBrand, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: '1.3' },
+  eventTitleOther: { color: tokens.colorNeutralForegroundOnBrand },
+  eventTitleDraft: { color: tokens.colorNeutralForegroundOnBrand },
+  eventMeta:       { fontSize: '10px', color: tokens.colorNeutralForegroundOnBrand, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', lineHeight: '1.3', opacity: 0.85 },
+  eventMetaOther:  { color: tokens.colorNeutralForegroundOnBrand },
   nowLine: {
     position: 'absolute', left: 0, right: 0, height: '2px',
     backgroundColor: tokens.colorPaletteRedForeground1, zIndex: 10, pointerEvents: 'none',
@@ -279,21 +285,31 @@ export const useCalStyles = makeStyles({
     color: tokens.colorNeutralForegroundOnBrand,
   },
   monthEvent: {
-    fontSize: '10px', padding: '1px 4px', borderRadius: '3px',
-    backgroundColor: tokens.colorBrandBackground2, color: tokens.colorBrandForeground1,
-    borderLeft: `2px solid ${tokens.colorBrandStroke1}`,
+    fontSize: '10px', padding: '1px 5px', borderRadius: '3px',
+    backgroundColor: tokens.colorBrandBackground, color: tokens.colorNeutralForegroundOnBrand,
+    borderLeft: `2px solid ${tokens.colorBrandBackgroundPressed}`,
     whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis',
-    cursor: 'pointer', ':hover': { filter: 'brightness(0.92)' },
+    cursor: 'pointer', display: 'flex', alignItems: 'center', gap: '3px',
+    ':hover': { filter: 'brightness(0.9)' },
   },
   monthEventOther: {
-    backgroundColor: tokens.colorPaletteRedBackground2,
-    color: tokens.colorPaletteRedForeground1,
-    borderLeft: `2px solid ${tokens.colorPaletteRedBorder1}`,
+    backgroundColor: tokens.colorPaletteRedBackground3,
+    color: tokens.colorNeutralForegroundOnBrand,
+    borderLeft: `2px solid ${tokens.colorPaletteRedBorderActive}`,
   },
   monthEventDraft: {
-    backgroundColor: tokens.colorPaletteTealBackground2,
-    color: tokens.colorPaletteTealForeground2,
-    borderLeft: `2px dashed ${tokens.colorPaletteTealBorderActive}`,
+    backgroundColor: tokens.colorPaletteTealBorderActive,
+    color: tokens.colorNeutralForegroundOnBrand,
+    borderLeft: `2px dashed ${tokens.colorPaletteTealForeground2}`,
+  },
+  monthEventDeleteBtn: {
+    background: 'none', border: 'none', padding: '0', margin: '0',
+    cursor: 'pointer', display: 'flex', alignItems: 'center', flexShrink: 0,
+    color: 'inherit', opacity: 0.8, lineHeight: 1,
+    ':hover': { opacity: 1 },
+  },
+  monthEventLabel: {
+    flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap',
   },
   monthMore: { fontSize: '10px', color: tokens.colorNeutralForeground3, paddingLeft: '4px' },
   monthHint: {
@@ -333,12 +349,13 @@ const EventPopup: React.FC<{
   onEdit?: () => void;
 }> = ({ booking, isOwn, onCancel, cancelling, onEdit }) => {
   const s = useCalStyles();
+  const fmt = useFormatTime();
   return (
     <div className={s.eventPopup}>
       <div className={s.popupTitle}>{booking.desk.name}</div>
       <div className={s.popupRow}>
         <Clock20Regular style={{ fontSize: '13px', flexShrink: 0 }} />
-        {calFormatTime(booking.start_time)} – {calFormatTime(booking.end_time)}
+        {fmt(booking.start_time)} – {fmt(booking.end_time)}
       </div>
       <div className={s.popupRow}>
         <DoorRegular style={{ fontSize: '13px', flexShrink: 0 }} />
@@ -440,6 +457,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
   editingBookingId = null, onOwnBookingClick,
 }) => {
   const s = useCalStyles();
+  const fmt = useFormatTime();
   const [now, setNow] = useState(new Date());
 
   // ── Past-time guards (Bug 1) ──
@@ -655,7 +673,19 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
         : [dateKey, pendingDate];
       setPendingDate(null);
       setHoverDate(null);
-      onInteract({ startDate: d1, endDate: d2, startTime: '09:00', endTime: '17:00' });
+      // If the start date is today, snap startTime to the next 30-min boundary
+      // so the booking is never in the past.
+      const todayKey = calDateStr(calStartOfDay(new Date()));
+      let startTime = '00:00';
+      if (d1 === todayKey) {
+        const now = new Date();
+        const rawH = now.getHours() + now.getMinutes() / 60;
+        const snapped = Math.ceil(rawH * 2) / 2; // round UP to next 30-min
+        const hh = Math.floor(snapped) % 24;
+        const mm = snapped % 1 === 0.5 ? 30 : 0;
+        startTime = `${String(hh).padStart(2, '0')}:${String(mm).padStart(2, '0')}`;
+      }
+      onInteract({ startDate: d1, endDate: d2, startTime, endTime: '23:59' });
     }
   }, [interactive, pendingDate, onInteract, isPastDate]);
 
@@ -740,7 +770,9 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
       .filter(dr => dr.date === key && dr.start < dr.end)
       .map((dr, i) => (
         <div key={`draft-${i}`} className={`${s.monthEvent} ${s.monthEventDraft}`}>
-          {dr.label ? `${dr.start} ${dr.label}` : `${dr.start} – ${dr.end}`}
+          <span className={s.monthEventLabel}>
+            {dr.start}–{dr.end}{dr.label ? ` ${dr.label}` : ''}
+          </span>
         </div>
       ));
   };
@@ -812,18 +844,36 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
                   {d.getDate()}
                 </div>
                 {renderMonthDraftBlocks(d)}
-                  {visible.map(({ booking, isOwn }) => (
-                  <Tooltip key={`${booking.id}-${key}`}
-                    content={<EventPopup booking={booking} isOwn={isOwn}
-                      onEdit={isOwn && onEditBooking ? () => onEditBooking(booking) : undefined}
-                      onCancel={isOwn && onCancelBooking ? () => onCancelBooking(booking) : undefined}
-                      cancelling={cancellingId === booking.id} />}
-                    relationship="description" positioning="below-start" withArrow>
-                    <div className={`${s.monthEvent} ${!isOwn ? s.monthEventOther : ''}`}
-                      onClick={e => e.stopPropagation()}>
-                      {calFormatTime(booking.start_time)} {booking.desk.name}
-                    </div>
-                  </Tooltip>
+                  {visible.map(({ booking, isOwn, dayStart, dayEnd }) => (
+                  <Popover key={`${booking.id}-${key}`} positioning="below-start" withArrow openOnHover={false}>
+                    <PopoverTrigger disableButtonEnhancement>
+                      <div className={`${s.monthEvent} ${!isOwn ? s.monthEventOther : ''}`}
+                        onClick={e => e.stopPropagation()}>
+                        <span className={s.monthEventLabel}>
+                          {fmt(dayStart ?? booking.start_time)}–{fmt(dayEnd ?? booking.end_time)} {booking.desk.name}
+                        </span>
+                        {isOwn && onCancelBooking && (
+                          cancellingId === booking.id
+                            ? <Spinner size="tiny" />
+                            : (
+                              <button
+                                className={s.monthEventDeleteBtn}
+                                title="Cancel booking"
+                                onClick={e => { e.stopPropagation(); onCancelBooking(booking); }}
+                              >
+                                <Delete20Regular style={{ fontSize: '11px' }} />
+                              </button>
+                            )
+                        )}
+                      </div>
+                    </PopoverTrigger>
+                    <PopoverSurface style={{ padding: 0 }}>
+                      <EventPopup booking={booking} isOwn={isOwn}
+                        onEdit={isOwn && onEditBooking ? () => onEditBooking(booking) : undefined}
+                        onCancel={isOwn && onCancelBooking ? () => onCancelBooking(booking) : undefined}
+                        cancelling={cancellingId === booking.id} />
+                    </PopoverSurface>
+                  </Popover>
                 ))}
                 {overflow > 0 && <div className={s.monthMore}>+{overflow} more</div>}
               </div>
@@ -930,7 +980,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
                       ? (
                         <div style={{ padding: '6px 10px', minWidth: '160px' }}>
                           <div style={{ fontWeight: 600, fontSize: '13px', marginBottom: '4px' }}>
-                            {calFormatTime(booking.start_time)}–{calFormatTime(booking.end_time)}
+                            {fmt(booking.start_time)}–{fmt(booking.end_time)}
                           </div>
                           <div style={{ fontSize: '11px', color: tokens.colorPaletteRedForeground1 }}>
                             Booked by {booking.username}
@@ -980,13 +1030,13 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
                       >
                         <div className={`${s.eventTitle} ${!isOwn ? s.eventTitleOther : ''}`}>{booking.desk.name}</div>
                         <div className={`${s.eventMeta} ${!isOwn ? s.eventMetaOther : ''}`}>
-                          {calFormatTime(booking.start_time)}–{calFormatTime(booking.end_time)}
+                          {fmt(booking.start_time)}–{fmt(booking.end_time)}
                         </div>
                         {!isOwn && !clickMode && (
                           <div className={`${s.eventMeta} ${s.eventMetaOther}`}>{booking.username}</div>
                         )}
                         {clickMode && isOwn && !isEditingThis && (
-                          <div className={`${s.eventMeta} ${s.eventTitleDraft}`}>click to edit</div>
+                          <div className={`${s.eventMeta}`} style={{ fontStyle: 'italic', opacity: 0.8 }}>click to edit</div>
                         )}
                         {clickMode && !isOwn && (
                           <div className={`${s.eventMeta} ${s.eventMetaOther}`}>{booking.username}</div>
@@ -1030,6 +1080,7 @@ export const BookingsCalendar: React.FC<BookingsCalendarProps> = ({
   const s = useCalStyles();
   const { authenticatedFetch, user } = useAuth();
   const bookingApi = createBookingApi(authenticatedFetch);
+  const fmt = useFormatTime();
 
   const [view, setView]       = useState<ViewMode>('week');
   const [anchor, setAnchor]   = useState<Date>(calStartOfDay(new Date()));
@@ -1062,7 +1113,7 @@ export const BookingsCalendar: React.FC<BookingsCalendarProps> = ({
   useEffect(() => { if (refreshToken !== undefined) loadBookings(); }, [refreshToken]);
 
   const handleCancel = async (booking: Booking) => {
-    if (!confirm(`Cancel ${booking.desk.name} on ${calFormatShortDate(new Date(booking.start_time))}?`)) return;
+    if (!confirm(`Cancel booking for ${booking.desk.name}?`)) return;
     setCancellingId(booking.id);
     try {
       await bookingApi.cancelBooking(booking.id);
