@@ -366,7 +366,40 @@ export const BookingModal: React.FC<BookingModalProps> = ({
   editingBooking, onBookingUpdated, onEditBooking, onEditingDone,
 }) => {
   const styles = useStyles();
-  const { formatTime } = usePreferences();
+  const { formatTime, preferences } = usePreferences();
+  const userTz = preferences?.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
+
+  /**
+   * Extract YYYY-MM-DD and HH:MM from an ISO string in the user's timezone.
+   * Used when seeding edit state so the time shown matches what the user booked.
+   */
+  const isoToDateTimeParts = (iso: string): { date: string; time: string } => {
+    try {
+      const d = new Date(iso);
+      const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone: userTz,
+        year: 'numeric', month: '2-digit', day: '2-digit',
+        hour: '2-digit', minute: '2-digit', hour12: false,
+      }).formatToParts(d);
+      const year  = parts.find(p => p.type === 'year')?.value   ?? '';
+      const month = parts.find(p => p.type === 'month')?.value  ?? '';
+      const day   = parts.find(p => p.type === 'day')?.value    ?? '';
+      let   hour  = Number(parts.find(p => p.type === 'hour')?.value   ?? 0);
+      const min   = Number(parts.find(p => p.type === 'minute')?.value ?? 0);
+      if (hour === 24) hour = 0;
+      return {
+        date: `${year}-${month}-${day}`,
+        time: `${String(hour).padStart(2,'0')}:${String(min).padStart(2,'0')}`,
+      };
+    } catch {
+      // Fallback: browser local time
+      const d = new Date(iso);
+      return {
+        date: calDateStr(d),
+        time: `${String(d.getHours()).padStart(2,'0')}:${String(d.getMinutes()).padStart(2,'0')}`,
+      };
+    }
+  };
   // fmtTime: format an HH:MM string using the user's time_format preference
   const fmtTime = (t: string) => {
     const [h, m] = t.split(':').map(Number);
@@ -460,14 +493,12 @@ export const BookingModal: React.FC<BookingModalProps> = ({
     if (!open) return;
     if (editingBooking) {
       // Edit mode: lock in the existing start, go straight to step 1 so user just picks a new end
-      const start = new Date(editingBooking.start_time);
-      const sDate = calDateStr(start);
-      const sTime = `${String(start.getHours()).padStart(2,'0')}:${String(start.getMinutes()).padStart(2,'0')}`;
+      const { date: sDate, time: sTime } = isoToDateTimeParts(editingBooking.start_time);
       setStartDate(sDate); setStartTime(sTime);
       setEndDate(null); setEndTime(null);
       setStep(1);
       setCalView('week');
-      setCalAnchor(calStartOfWeek(calStartOfDay(start)));
+      setCalAnchor(calStartOfWeek(calStartOfDay(new Date(editingBooking.start_time))));
     } else {
       setStartDate(null); setStartTime(null);
       setEndDate(null); setEndTime(null);
@@ -482,9 +513,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
   useEffect(() => {
     if (editingBooking) {
       // Re-anchor the start from the editing booking, go back to step 1
-      const start = new Date(editingBooking.start_time);
-      const sDate = calDateStr(start);
-      const sTime = `${String(start.getHours()).padStart(2,'0')}:${String(start.getMinutes()).padStart(2,'0')}`;
+      const { date: sDate, time: sTime } = isoToDateTimeParts(editingBooking.start_time);
       setStartDate(sDate); setStartTime(sTime);
       setEndDate(null); setEndTime(null);
       setStep(1);
@@ -549,7 +578,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
     return calAnchor.toLocaleDateString([], { month: 'long', year: 'numeric' });
   }, [calView, calAnchor]);
 
-  const bookingsByDay = useMemo(() => expandBookingsByDay(deskBookings, myUsername), [deskBookings, myUsername]);
+  const bookingsByDay = useMemo(() => expandBookingsByDay(deskBookings, myUsername, userTz), [deskBookings, myUsername, userTz]);
 
   // ── Calendar click-click interaction handler ──
   const handleCalInteract = useCallback((sel: CalendarInteraction) => {

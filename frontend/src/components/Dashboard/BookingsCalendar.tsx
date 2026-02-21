@@ -51,6 +51,56 @@ function useFormatTime() {
   const { formatTime } = usePreferences();
   return (iso: string) => { try { return formatTime(new Date(iso)); } catch { return ''; } };
 }
+
+/**
+ * Extract decimal hours (e.g. 14.5 = 14:30) from an ISO string in a given IANA timezone.
+ * Falls back to browser-local getHours() if Intl fails.
+ */
+function isoToHourInTz(iso: string, tz: string): number {
+  try {
+    const d = new Date(iso);
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: tz,
+      hour: 'numeric',
+      minute: 'numeric',
+      hour12: false,
+    }).formatToParts(d);
+    const h = Number(parts.find(p => p.type === 'hour')?.value   ?? 0);
+    const m = Number(parts.find(p => p.type === 'minute')?.value ?? 0);
+    // Intl returns hour 24 for midnight — normalise to 0
+    return (h === 24 ? 0 : h) + m / 60;
+  } catch {
+    const d = new Date(iso);
+    return d.getHours() + d.getMinutes() / 60;
+  }
+}
+
+/**
+ * Format an integer hour (7–21) as a gutter label respecting time_format preference.
+ * 24h → "07:00"; 12h → "7 AM" / "12 PM" / "1 PM"
+ */
+function formatGutterHour(h: number, timeFormat: '12' | '24'): string {
+  if (timeFormat === '24') return `${String(h).padStart(2, '0')}:00`;
+  if (h === 0 || h === 24) return '12 AM';
+  if (h === 12) return '12 PM';
+  return h < 12 ? `${h} AM` : `${h - 12} PM`;
+}
+
+/**
+ * Format an HH:MM string (draft/drag time) respecting time_format preference.
+ * "14:30" → "14:30" (24h) or "2:30 PM" (12h)
+ */
+function formatHHMM(hhmm: string, timeFormat: '12' | '24'): string {
+  if (timeFormat === '24') return hhmm;
+  const [hStr, mStr] = hhmm.split(':');
+  const h = Number(hStr);
+  const m = Number(mStr);
+  if (h === 0)  return `12:${String(m).padStart(2,'0')} AM`;
+  if (h === 12) return `12:${String(m).padStart(2,'0')} PM`;
+  return h < 12
+    ? `${h}:${String(m).padStart(2,'0')} AM`
+    : `${h - 12}:${String(m).padStart(2,'0')} PM`;
+}
 export function calFormatShortDate(d: Date): string {
   return d.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
 }
@@ -74,29 +124,102 @@ const WEEKDAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const HOURS    = Array.from({ length: CAL_HOUR_RANGE + 1 }, (_, i) => CAL_HOUR_START + i);
 
 /** Expand bookings into a day-keyed map, spreading multi-day bookings across every day they cover. */
+/**
+ * Return the YYYY-MM-DD date string for an ISO timestamp in a given IANA timezone.
+ * Used to assign bookings to the correct calendar day regardless of browser timezone.
+ */
+export function tzDateStr(iso: string, tz: string): string {
+  try {
+    const parts = new Intl.DateTimeFormat('en-US', {
+      timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit',
+    }).formatToParts(new Date(iso));
+    return `${parts.find(p => p.type === 'year')?.value}-${parts.find(p => p.type === 'month')?.value}-${parts.find(p => p.type === 'day')?.value}`;
+  } catch {
+    const d = new Date(iso);
+    return calDateStr(d);
+  }
+}
+
+/**
+ * Build a UTC ISO string for midnight (00:00:00) of a YYYY-MM-DD date in the given timezone.
+ * e.g. "2026-02-21" in "Europe/London" (GMT+1 in summer) → "2026-02-20T23:00:00.000Z"
+ */
+function tzMidnightUTC(dateStr: string, tz: string): string {
+  // Parse the date components, then find what UTC instant is midnight in that timezone.
+  // We use the trick of constructing a local-time string and letting Intl resolve it.
+  try {
+    const [y, m, d] = dateStr.split('-').map(Number);
+    // Try each of the 48 possible UTC offsets to find which UTC time is midnight in tz.
+    // More directly: use Date.parse with a timezone-anchored string via the formatter round-trip.
+    // Reliable approach: format a known UTC time and compare.
+    // Fastest: use the DateTimeFormat offset.
+    const probe = new Date(`${dateStr}T12:00:00Z`); // noon UTC — safely within same calendar day in any tz
+    const probeStr = new Intl.DateTimeFormat('en-US', {
+      timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
+    }).format(probe);
+    // probeStr gives us the local time in tz for noon UTC.
+    // Subtract the local hour offset to find midnight.
+    const localParts = new Intl.DateTimeFormat('en-US', {
+      timeZone: tz, hour: 'numeric', minute: 'numeric', second: 'numeric', hour12: false,
+    }).formatToParts(probe);
+    const localH = Number(localParts.find(p => p.type === 'hour')?.value ?? 12);
+    const localM = Number(localParts.find(p => p.type === 'minute')?.value ?? 0);
+    const localS = Number(localParts.find(p => p.type === 'second')?.value ?? 0);
+    // Offset from midnight in seconds: (localH*3600 + localM*60 + localS)
+    const offsetMs = ((localH === 24 ? 0 : localH) * 3600 + localM * 60 + localS) * 1000;
+    const midnightUTC = new Date(probe.getTime() - offsetMs - 12 * 3600_000);
+    return midnightUTC.toISOString();
+  } catch {
+    return `${dateStr}T00:00:00.000Z`;
+  }
+}
+
 export function expandBookingsByDay(
   bookings: Booking[],
-  myUsername?: string
+  myUsername?: string,
+  tz?: string,
 ): Map<string, Array<{ booking: Booking; isOwn: boolean; dayStart: string; dayEnd: string }>> {
+  const timezone = tz ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
   const map = new Map<string, Array<{ booking: Booking; isOwn: boolean; dayStart: string; dayEnd: string }>>();
 
   bookings.forEach(b => {
     const isOwn = !!myUsername && b.username === myUsername;
-    const start = new Date(b.start_time);
-    const end   = new Date(b.end_time);
-    // Walk from start day to end day
-    let cur = calStartOfDay(start);
-    const endDay = calStartOfDay(end);
-    while (cur <= endDay) {
-      const key = calDateStr(cur);
-      const isFirst = calIsSameDay(cur, start);
-      const isLast  = calIsSameDay(cur, end);
-      // Per-day display times: clamp to the actual booking times on boundary days
-      const dayStart = isFirst ? b.start_time : `${key}T00:00:00`;
-      const dayEnd   = isLast  ? b.end_time   : `${key}T23:59:59`;
-      if (!map.has(key)) map.set(key, []);
-      map.get(key)!.push({ booking: b, isOwn, dayStart, dayEnd });
-      cur = calAddDays(cur, 1);
+
+    // Determine start/end date strings in the user's timezone
+    const startDateKey = tzDateStr(b.start_time, timezone);
+    const endDateKey   = tzDateStr(b.end_time,   timezone);
+
+    // Walk calendar days from startDateKey to endDateKey
+    let curDateStr = startDateKey;
+    let safetyLimit = 0;
+    while (curDateStr <= endDateKey && safetyLimit++ < 366) {
+      const isFirst = curDateStr === startDateKey;
+      const isLast  = curDateStr === endDateKey;
+
+      // Boundary times: use the real ISO for first/last day;
+      // for intermediate days use midnight→23:59:59 expressed as proper UTC instants.
+      const dayStart = isFirst
+        ? b.start_time
+        : tzMidnightUTC(curDateStr, timezone);
+      const dayEnd = isLast
+        ? b.end_time
+        : (() => {
+            const nextMidnight = tzMidnightUTC(
+              // next day
+              calDateStr(calAddDays(new Date(`${curDateStr}T12:00:00Z`), 1)),
+              timezone
+            );
+            // 23:59:59 = one second before next midnight
+            return new Date(new Date(nextMidnight).getTime() - 1000).toISOString();
+          })();
+
+      if (!map.has(curDateStr)) map.set(curDateStr, []);
+      map.get(curDateStr)!.push({ booking: b, isOwn, dayStart, dayEnd });
+
+      // Advance to next calendar day
+      const nextDay = calAddDays(new Date(`${curDateStr}T12:00:00Z`), 1);
+      curDateStr = calDateStr(nextDay);
     }
   });
 
@@ -458,6 +581,11 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
 }) => {
   const s = useCalStyles();
   const fmt = useFormatTime();
+  const { preferences } = usePreferences();
+  const userTz = preferences?.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const timeFormat: '12' | '24' = preferences?.time_format ?? '24';
+  // Timezone-aware ISO → decimal hour
+  const isoToH = (iso: string) => isoToHourInTz(iso, userTz);
   const [now, setNow] = useState(new Date());
 
   // ── Past-time guards (Bug 1) ──
@@ -566,13 +694,11 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
     const snappedHour = snapHour(rawHour);
 
     const colEvts = bookingsByDay.get(date) ?? [];
-    const toH = (iso: string) => { const d = new Date(iso); return d.getHours() + d.getMinutes() / 60; };
-
     // Check if click lands inside the booking currently being edited.
     const isInsideEditingBooking = editingBookingId != null && colEvts.some(({ booking }) =>
       booking.id === editingBookingId &&
-      rawHour >= toH(booking.start_time) &&
-      rawHour < toH(booking.end_time)
+      rawHour >= isoToH(booking.start_time) &&
+      rawHour < isoToH(booking.end_time)
     );
 
     // clickLocked: selection committed, waiting for Save/Cancel.
@@ -588,8 +714,8 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
     // Block clicks inside any booked interval — own or other — unless this is
     // the exact booking currently being edited (pointerEvents:none, falls through).
     for (const { booking, isOwn } of colEvts) {
-      const bStart = toH(booking.start_time);
-      const bEnd   = toH(booking.end_time);
+      const bStart = isoToH(booking.start_time);
+      const bEnd   = isoToH(booking.end_time);
       if (rawHour >= bStart && rawHour < bEnd) {
         if (isOwn && booking.id === editingBookingId) continue;
         return;
@@ -620,7 +746,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
       // snap to "now" so the selection never extends into past time.
       const colDay = days[ci];
       const hour = (colDay && isPastHour(colDay, rawHour))
-        ? snapHour(new Date().getHours() + new Date().getMinutes() / 60)
+        ? snapHour(isoToH(new Date().toISOString()))
         : rawHour;
       dragRef.current.curColIdx = ci;
       dragRef.current.curHour   = hour;
@@ -679,7 +805,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
       let startTime = '00:00';
       if (d1 === todayKey) {
         const now = new Date();
-        const rawH = now.getHours() + now.getMinutes() / 60;
+        const rawH = isoToH(now.toISOString());
         const snapped = Math.ceil(rawH * 2) / 2; // round UP to next 30-min
         const hh = Math.floor(snapped) % 24;
         const mm = snapped % 1 === 0.5 ? 30 : 0;
@@ -691,7 +817,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
 
   // ── Now line ──
   const nowTopPct = Math.max(0, Math.min(100,
-    ((now.getHours() + now.getMinutes() / 60 - CAL_HOUR_START) / CAL_HOUR_RANGE) * 100
+    ((isoToH(now.toISOString()) - CAL_HOUR_START) / CAL_HOUR_RANGE) * 100
   ));
 
   const renderHourLines = () =>
@@ -706,7 +832,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
 
   const renderNowLine = (d: Date) => {
     if (!calIsSameDay(d, now)) return null;
-    const h = now.getHours() + now.getMinutes() / 60;
+    const h = isoToH(now.toISOString());
     if (h < CAL_HOUR_START || h > CAL_HOUR_END) return null;
     return (
       <div className={s.nowLine} style={{ top: `${nowTopPct}%` }}>
@@ -739,8 +865,10 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
         const topP    = ((visStart - CAL_HOUR_START) / CAL_HOUR_RANGE) * 100;
         const heightP = Math.max(1.5, ((visEnd - visStart) / CAL_HOUR_RANGE) * 100);
 
-        // Label: show actual (unclamped) time range so user sees e.g. "00:00 – 23:59"
-        const timeRange = `${dr.start} – ${dr.end}`;
+        // Label: show actual (unclamped) time range formatted per user preferences
+        const fmtS = formatHHMM(dr.start, timeFormat);
+        const fmtE = formatHHMM(dr.end, timeFormat);
+        const timeRange = `${fmtS} – ${fmtE}`;
 
         return (
           <div key={`draft-${i}`}
@@ -755,7 +883,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
             )}
             {liveDrafts.length > 0 && i === 0 && (
               <div className={s.dragTooltip} style={{ top: '-18px' }}>
-                {dr.start}
+                {formatHHMM(dr.start, timeFormat)}
               </div>
             )}
           </div>
@@ -771,7 +899,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
       .map((dr, i) => (
         <div key={`draft-${i}`} className={`${s.monthEvent} ${s.monthEventDraft}`}>
           <span className={s.monthEventLabel}>
-            {dr.start}–{dr.end}{dr.label ? ` ${dr.label}` : ''}
+            {formatHHMM(dr.start, timeFormat)}–{formatHHMM(dr.end, timeFormat)}{dr.label ? ` ${dr.label}` : ''}
           </span>
         </div>
       ));
@@ -781,7 +909,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
     <div className={s.timeGutter}>
       {HOURS.map(h => (
         <div key={h} className={s.timeLabel}>
-          {String(h).padStart(2,'0')}:00
+          {formatGutterHour(h, timeFormat)}
         </div>
       ))}
     </div>
@@ -938,7 +1066,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
                     const evtStart = dayStart ?? booking.start_time;
                     const evtEnd   = dayEnd   ?? booking.end_time;
                     // Clamp to visible grid window
-                    const toH = (iso: string) => { const d = new Date(iso); return d.getHours() + d.getMinutes() / 60; };
+                    const toH = (iso: string) => isoToH(iso);
                     const visStart = Math.max(toH(evtStart), CAL_HOUR_START);
                     const visEnd   = Math.min(toH(evtEnd),   CAL_HOUR_END);
                     if (visEnd <= visStart) return null;
@@ -1145,7 +1273,9 @@ export const BookingsCalendar: React.FC<BookingsCalendarProps> = ({
     return anchor.toLocaleDateString([], { month: 'long', year: 'numeric' });
   }, [view, anchor]);
 
-  const bookingsByDay = useMemo(() => expandBookingsByDay(bookings, user?.username), [bookings, user?.username]);
+  const { preferences: calPrefs } = usePreferences();
+  const calTz = calPrefs?.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
+  const bookingsByDay = useMemo(() => expandBookingsByDay(bookings, user?.username, calTz), [bookings, user?.username, calTz]);
 
   return (
     <div className={s.root}>
