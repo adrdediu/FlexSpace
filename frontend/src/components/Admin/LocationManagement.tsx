@@ -20,6 +20,7 @@ import {
   Building20Regular,
   Settings20Regular,
   Delete20Regular,
+  LockClosed20Regular,
 } from '@fluentui/react-icons';
 import { ContentGrid, Section } from '../Layout';
 import { createLocationApi, type LocationListItem, type Location } from '../../services/locationApi';
@@ -29,6 +30,7 @@ import {
   ManageLocationModal, 
   ManageLocationManagersModal 
 } from './Modals/index';
+import { ManageLocationAllowedGroupsModal } from './Modals/ManageLocationAllowedGroupsModal';
 
 const useStyles = makeStyles({
   locationCard: {
@@ -135,6 +137,7 @@ export const LocationManagement: React.FC<LocationManagementProps> = ({
   const [addModalOpen, setAddModalOpen] = useState(false);
   const [manageModalOpen, setManageModalOpen] = useState(false);
   const [managersModalOpen, setManagersModalOpen] = useState(false);
+  const [groupsModalOpen, setGroupsModalOpen] = useState(false);
   const [selectedLocation, setSelectedLocation] = useState<Location | null>(null);
 
   // Create API instance with authenticatedFetch
@@ -203,6 +206,22 @@ export const LocationManagement: React.FC<LocationManagementProps> = ({
       await fetchLocations();
     } catch (err: any) {
       alert(err.message || 'Failed to update permissions');
+      throw err;
+    }
+  };
+
+  const handleManageGroups = async (locationId: number) => {
+    await fetchLocationDetails(locationId);
+    setGroupsModalOpen(true);
+  };
+
+  const handleSetAllowedGroups = async (locationId: number, groupIds: number[]) => {
+    try {
+      const updated = await locationApi.setAllowedGroups(locationId, groupIds);
+      setSelectedLocation(updated);
+      await fetchLocations();
+    } catch (err: any) {
+      alert(err.message || 'Failed to update allowed groups');
       throw err;
     }
   };
@@ -337,6 +356,15 @@ export const LocationManagement: React.FC<LocationManagementProps> = ({
                         >
                           Manage Managers
                         </MenuItem>
+                        <MenuItem
+                          icon={<LockClosed20Regular />}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleManageGroups(location.id);
+                          }}
+                        >
+                          Allowed Groups
+                        </MenuItem>
                         {user?.is_superuser && (
                           <MenuItem
                             icon={<Delete20Regular />}
@@ -393,6 +421,16 @@ export const LocationManagement: React.FC<LocationManagementProps> = ({
         location={selectedLocation}
         onUpdate={handleUpdateLocation}
         onTogglePermissions={handleTogglePermissions}
+      />
+
+      <ManageLocationAllowedGroupsModal
+        open={groupsModalOpen}
+        onClose={() => {
+          setGroupsModalOpen(false);
+          setSelectedLocation(null);
+        }}
+        location={selectedLocation}
+        onSetGroups={handleSetAllowedGroups}
       />
 
       <ManageLocationManagersModal

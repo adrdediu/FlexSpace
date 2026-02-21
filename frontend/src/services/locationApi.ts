@@ -10,6 +10,13 @@ export interface LocationManager {
   email: string;
 }
 
+export interface AllowedLocationGroup {
+  id: number;
+  name: string;
+  description: string;
+  member_count: number;
+}
+
 export interface Location {
   id: number;
   name: string;
@@ -19,12 +26,14 @@ export interface Location {
   lng?: number;
   country_code?: string;
   location_managers: LocationManager[];
+  allowed_groups: AllowedLocationGroup[];
   allow_room_managers_to_add_group_members: boolean;
   is_manager: boolean;
+  can_access: boolean;
   user_group_count: number;
   floor_count: number;
   room_count: number;
-  floors?: any[]; // Full floor objects if needed
+  floors?: any[];
 }
 
 export interface LocationListItem {
@@ -37,6 +46,7 @@ export interface LocationListItem {
   floor_count: number;
   room_count: number;
   is_manager: boolean;
+  can_access: boolean;
 }
 
 // Helper to handle API responses
@@ -163,6 +173,18 @@ export const createLocationApi = (authenticatedFetch: (url: string, options?: Re
   async getLocationGroups(id: number): Promise<any[]> {
     const response = await authenticatedFetch(`${API_BASE_URL}/admin/locations/${id}/user_groups/`);
     return handleResponse<any[]>(response);
+  },
+
+  /**
+   * Set which user groups can access this location.
+   * Empty array = open to all authenticated users.
+   */
+  async setAllowedGroups(id: number, groupIds: number[]): Promise<Location> {
+    const response = await authenticatedFetch(`${API_BASE_URL}/admin/locations/${id}/set_allowed_groups/`, {
+      method: 'POST',
+      body: JSON.stringify({ group_ids: groupIds }),
+    });
+    return handleResponse<Location>(response);
   },
 });
 

@@ -191,6 +191,40 @@ class LocationManagementViewSet(viewsets.ModelViewSet):
         serializer = UserGroupListSerializer(groups, many=True, context={'request': request})
         return Response(serializer.data)
 
+    @action(detail=True, methods=['post'])
+    def set_allowed_groups(self, request, pk=None):
+        """
+        Set which user groups can access this location.
+        Endpoint: POST /api/admin/locations/{id}/set_allowed_groups/
+        Body: {"group_ids": [1, 2, 3]}  — empty list = open to everyone.
+        Only location managers can call this.
+        """
+        location = self.get_object()
+
+        if not location.is_location_manager(request.user):
+            return Response(
+                {'error': 'Only location managers can set allowed groups'},
+                status=status.HTTP_403_FORBIDDEN
+            )
+
+        group_ids = request.data.get('group_ids', [])
+
+        if group_ids:
+            groups = UserGroup.objects.filter(id__in=group_ids)
+            # All groups must belong to this location
+            invalid = groups.exclude(location=location)
+            if invalid.exists():
+                return Response(
+                    {'error': 'All groups must belong to this location'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+            location.allowed_groups.set(groups)
+        else:
+            location.allowed_groups.clear()
+
+        serializer = LocationSerializer(location, context={'request': request})
+        return Response(serializer.data)
+
 
 class RoomManagementViewSet(viewsets.ModelViewSet):
     """

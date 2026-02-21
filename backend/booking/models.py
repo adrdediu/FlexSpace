@@ -59,6 +59,15 @@ class Location(models.Model):
         help_text='Allow room managers to add members to user groups'
     )
 
+    # Location-level access gate: only members of these groups can see/book any room here.
+    # Empty = open to all authenticated users (backward-compatible default).
+    allowed_groups = models.ManyToManyField(
+        'UserGroup',
+        related_name='accessible_locations',
+        blank=True,
+        help_text='User groups allowed to access this location. Empty = open to everyone.'
+    )
+
     class Meta:
         unique_together = ('name', 'country')
     
@@ -68,6 +77,22 @@ class Location(models.Model):
     def is_location_manager(self, user):
         """Check if user is a location manager"""
         return self.location_managers.filter(id=user.id).exists() or user.is_superuser
+
+    def can_user_access(self, user):
+        """
+        Gate check: can this user see and book within this location at all?
+        Superusers / staff and location managers always pass.
+        If no allowed_groups are set the location is open to everyone.
+        Otherwise the user must be a member of at least one allowed group.
+        """
+        if user.is_superuser or user.is_staff:
+            return True
+        if self.is_location_manager(user):
+            return True
+        if not self.allowed_groups.exists():
+            return True          # open location
+        user_groups = user.location_groups.filter(location=self)
+        return self.allowed_groups.filter(id__in=user_groups.values_list('id', flat=True)).exists()
     
 class Floor(models.Model):
     name = models.CharField(max_length=50)
@@ -130,17 +155,26 @@ class Room(models.Model):
         return self.floor.location.is_location_manager(user)
     
     def can_user_book(self, user):
-        """Check if user can book desks in this room"""
+        """
+        Two-layer access check:
+          1. Location gate  — user must be able to access this location at all.
+          2. Room gate      — user must be in at least one of the room's allowed_groups.
+                             If the room has NO allowed_groups set, nobody can book it
+                             (admins / managers excluded).
+        """
         if user.is_superuser or user.is_staff:
             return True
-        
-        # Check if user is in any allowed group
-        if self.allowed_groups.exists():
-            user_groups = user.location_groups.filter(location=self.floor.location)
-            return self.allowed_groups.filter(id__in=user_groups.values_list('id', flat=True)).exists()
-        
-        # If no groups set, allow all users
-        return True
+        if self.is_room_manager(user):
+            return True
+
+        # Layer 1: location-level gate
+        location = self.floor.location
+        if not location.can_user_access(user):
+            return False
+
+        # Layer 2: room-level gate (empty groups = nobody can book)
+        user_groups = user.location_groups.filter(location=location)
+        return self.allowed_groups.filter(id__in=user_groups.values_list('id', flat=True)).exists()
     
 class Desk(models.Model):
     name = models.CharField(max_length=100)

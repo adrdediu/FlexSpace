@@ -106,7 +106,7 @@ export const ManageLocationModal: React.FC<ManageLocationModalProps> = ({
   const [countryCode, setCountryCode] = useState('');
   const [allowRoomManagers, setAllowRoomManagers] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  
+
   // Floor management
   const [floors, setFloors] = useState<Floor[]>([]);
   const [loadingFloors, setLoadingFloors] = useState(false);
@@ -123,8 +123,6 @@ export const ManageLocationModal: React.FC<ManageLocationModalProps> = ({
       setLng(location.lng?.toString() || '');
       setCountryCode(location.country_code || '');
       setAllowRoomManagers(location.allow_room_managers_to_add_group_members);
-      
-      // Load floors
       fetchFloors(location.id);
     }
   }, [location]);

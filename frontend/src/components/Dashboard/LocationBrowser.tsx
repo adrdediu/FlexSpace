@@ -204,6 +204,7 @@ interface PublicLocation {
   lng?: number;
   floor_count: number;
   room_count: number;
+  can_access: boolean;
 }
 
 interface PublicRoom {
@@ -429,7 +430,8 @@ export const LocationBrowser: React.FC<LocationBrowserProps> = ({
               <div
                 key={loc.id}
                 className={styles.card}
-                onClick={() => handleLocationClick(loc)}
+                onClick={() => loc.can_access && handleLocationClick(loc)}
+                style={!loc.can_access ? { opacity: 0.55, cursor: 'not-allowed' } : undefined}
               >
                 <div className={`${styles.cardIcon} ${styles.cardIconLocation}`}>
                   <BuildingRegular />
@@ -442,9 +444,13 @@ export const LocationBrowser: React.FC<LocationBrowserProps> = ({
                     {loc.floor_count} {loc.floor_count === 1 ? 'floor' : 'floors'}
                     {' · '}
                     {loc.room_count} {loc.room_count === 1 ? 'room' : 'rooms'}
+                    {!loc.can_access && ' · Access restricted'}
                   </div>
                 </div>
-                <ChevronRight20Regular style={{ color: tokens.colorNeutralForeground3 }} />
+                {loc.can_access
+                  ? <ChevronRight20Regular style={{ color: tokens.colorNeutralForeground3 }} />
+                  : <LockClosed16Regular style={{ color: tokens.colorNeutralForeground3 }} />
+                }
               </div>
             ))}
           </div>
