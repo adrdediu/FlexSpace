@@ -12,6 +12,8 @@ import {
 import { createBookingApi, type Booking } from '../../services/bookingApi';
 import { useAuth } from '../../contexts/AuthContext';
 import { usePreferences } from '../../contexts/PreferencesContext';
+import { BookingStatsPanel } from './BookingStatsPanel';
+import { BookingModal } from './BookingModal';
 
 // ─── View modes ───────────────────────────────────────────────────────────────
 type ViewMode = 'day' | 'week' | 'month';
@@ -997,7 +999,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
                     </PopoverTrigger>
                     <PopoverSurface style={{ padding: 0 }}>
                       <EventPopup booking={booking} isOwn={isOwn}
-                        onEdit={isOwn && onEditBooking ? () => onEditBooking(booking) : undefined}
+                        onEdit={isOwn && onEditBooking && new Date(booking.end_time) > now ? () => onEditBooking(booking) : undefined}
                         onCancel={isOwn && onCancelBooking ? () => onCancelBooking(booking) : undefined}
                         cancelling={cancellingId === booking.id} />
                     </PopoverSurface>
@@ -1072,8 +1074,10 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
                     if (visEnd <= visStart) return null;
                     const topP    = ((visStart - CAL_HOUR_START) / CAL_HOUR_RANGE) * 100;
                     const heightP = Math.max(1.5, ((visEnd - visStart) / CAL_HOUR_RANGE) * 100);
-                    // canEdit: clicking the event block opens the full edit modal (non-clickMode only)
-                    const canEdit = isOwn && !!onEditBooking && !clickMode;
+                    // canEdit: clicking the event block opens the full edit modal (non-clickMode only).
+                    // A fully-elapsed booking (end_time in the past) cannot be edited,
+                    // but an ongoing booking (started but not yet ended) can be extended.
+                    const canEdit = isOwn && !!onEditBooking && !clickMode && new Date(booking.end_time) > now;
 
                     // The booking currently being re-timed in the modal → fully transparent
                     const isEditingThis = clickMode && editingBookingId === booking.id;
@@ -1120,7 +1124,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
                       )
                       : (
                         <EventPopup booking={booking} isOwn={isOwn}
-                          onEdit={isOwn && onEditBooking && !clickMode ? () => onEditBooking(booking) : undefined}
+                          onEdit={isOwn && onEditBooking && !clickMode && new Date(booking.end_time) > now ? () => onEditBooking(booking) : undefined}
                           onCancel={isOwn && onCancelBooking && !clickMode ? () => onCancelBooking(booking) : undefined}
                           cancelling={cancellingId === booking.id} />
                       );
@@ -1216,6 +1220,10 @@ export const BookingsCalendar: React.FC<BookingsCalendarProps> = ({
   const [loading, setLoading]  = useState(true);
   const [cancellingId, setCancellingId] = useState<number | null>(null);
 
+  // ── Edit state ──
+  const [editingBooking, setEditingBooking] = useState<Booking | null>(null);
+  const [bookingModalOpen, setBookingModalOpen] = useState(false);
+
   const days: Date[] = useMemo(() => {
     if (view === 'day')  return [anchor];
     if (view === 'week') {
@@ -1251,6 +1259,22 @@ export const BookingsCalendar: React.FC<BookingsCalendarProps> = ({
     finally { setCancellingId(null); }
   };
 
+  // ── Open BookingModal in edit mode for a booking clicked in the calendar ──
+  const handleEditBooking = useCallback((booking: Booking) => {
+    setEditingBooking(booking);
+    setBookingModalOpen(true);
+  }, []);
+
+  const handleCloseBookingModal = useCallback(() => {
+    setBookingModalOpen(false);
+    setEditingBooking(null);
+  }, []);
+
+  const handleBookingUpdated = useCallback(() => {
+    loadBookings();
+    onBookingCancelled?.(); // reuse to signal parent that bookings changed
+  }, [loadBookings, onBookingCancelled]);
+
   const navigate = (dir: -1 | 1) => setAnchor(prev => {
     if (view === 'day')  return calAddDays(prev, dir);
     if (view === 'week') return calAddDays(prev, dir * 7);
@@ -1277,47 +1301,76 @@ export const BookingsCalendar: React.FC<BookingsCalendarProps> = ({
   const calTz = calPrefs?.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
   const bookingsByDay = useMemo(() => expandBookingsByDay(bookings, user?.username, calTz), [bookings, user?.username, calTz]);
 
+  // Derive desk info from the editing booking for BookingModal
+  const editingDeskInfo = editingBooking
+    ? { id: editingBooking.desk.id, name: editingBooking.desk.name, color: '#22c55e' }
+    : null;
+
   return (
-    <div className={s.root}>
-      <div className={s.toolbar}>
-        <div className={s.toolbarLeft}>
-          <Button size="small" appearance="subtle" onClick={goToday}>Today</Button>
-          <Button size="small" appearance="subtle" icon={<ChevronLeft20Regular />} onClick={() => navigate(-1)} />
-          <Button size="small" appearance="subtle" icon={<ChevronRight20Regular />} onClick={() => navigate(1)} />
-          <Text className={s.titleText}>{title}</Text>
+    <>
+      <div className={s.root}>
+        <BookingStatsPanel refreshToken={refreshToken} />
+        <div className={s.toolbar}>
+          <div className={s.toolbarLeft}>
+            <Button size="small" appearance="subtle" onClick={goToday}>Today</Button>
+            <Button size="small" appearance="subtle" icon={<ChevronLeft20Regular />} onClick={() => navigate(-1)} />
+            <Button size="small" appearance="subtle" icon={<ChevronRight20Regular />} onClick={() => navigate(1)} />
+            <Text className={s.titleText}>{title}</Text>
+          </div>
+          <div className={s.toolbarRight}>
+            {(['day', 'week', 'month'] as ViewMode[]).map(v => (
+              <Button key={v} size="small"
+                appearance={view === v ? 'primary' : 'subtle'}
+                icon={v === 'day' ? <CalendarDay20Regular /> : v === 'week' ? <CalendarWeekNumbers20Regular /> : <CalendarMonth20Regular />}
+                onClick={() => setView(v)}
+              >
+                {v.charAt(0).toUpperCase() + v.slice(1)}
+              </Button>
+            ))}
+          </div>
         </div>
-        <div className={s.toolbarRight}>
-          {(['day', 'week', 'month'] as ViewMode[]).map(v => (
-            <Button key={v} size="small"
-              appearance={view === v ? 'primary' : 'subtle'}
-              icon={v === 'day' ? <CalendarDay20Regular /> : v === 'week' ? <CalendarWeekNumbers20Regular /> : <CalendarMonth20Regular />}
-              onClick={() => setView(v)}
-            >
-              {v.charAt(0).toUpperCase() + v.slice(1)}
-            </Button>
-          ))}
-        </div>
+
+        {loading ? (
+          <div className={s.loadingWrap}><Spinner size="medium" /></div>
+        ) : bookings.length === 0 && view !== 'month' ? (
+          <div className={s.empty}>
+            <CalendarLtr20Regular style={{ fontSize: '36px' }} />
+            <Text size={300} weight="semibold">No bookings in this period</Text>
+            <Text size={200}>Select a room on the map to book a desk</Text>
+          </div>
+        ) : (
+          <CalendarGrid
+            view={view}
+            anchor={anchor}
+            days={view === 'month' ? [] : days}
+            bookingsByDay={bookingsByDay}
+            onCancelBooking={handleCancel}
+            cancellingId={cancellingId}
+            onEditBooking={handleEditBooking}
+          />
+        )}
       </div>
 
-      {loading ? (
-        <div className={s.loadingWrap}><Spinner size="medium" /></div>
-      ) : bookings.length === 0 && view !== 'month' ? (
-        <div className={s.empty}>
-          <CalendarLtr20Regular style={{ fontSize: '36px' }} />
-          <Text size={300} weight="semibold">No bookings in this period</Text>
-          <Text size={200}>Select a room on the map to book a desk</Text>
-        </div>
-      ) : (
-        <CalendarGrid
-          view={view}
-          anchor={anchor}
-          days={view === 'month' ? [] : days}
-          bookingsByDay={bookingsByDay}
-          onCancelBooking={handleCancel}
-          cancellingId={cancellingId}
+      {/* Edit modal — rendered outside the calendar div so it overlays correctly */}
+      {editingDeskInfo && (
+        <BookingModal
+          open={bookingModalOpen}
+          desk={editingDeskInfo}
+          roomName={editingBooking?.room_name ?? ''}
+          onClose={handleCloseBookingModal}
+          onConfirm={async () => { handleBookingUpdated(); }}
+          myUsername={user?.username}
+          bookingApi={bookingApi}
+          editingBooking={editingBooking}
+          onBookingUpdated={handleBookingUpdated}
+          onEditingDone={handleCloseBookingModal}
+          onEditBooking={handleEditBooking}
+          fetchBookings={(start, end) =>
+            bookingApi.getMyBookings({ desk: editingBooking!.desk.id, start, end })
+          }
         />
       )}
-    </div>
+    </>
   );
 };
 

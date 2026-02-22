@@ -356,6 +356,13 @@ export interface BookingModalProps {
   onEditBooking?: (b: Booking) => void;
   /** Called when the edit session ends (save, cancel, or close) so parent can clear editingBooking */
   onEditingDone?: () => void;
+  /**
+   * Optional override for loading calendar bookings.
+   * When provided, replaces the default getDeskBookingsRange call.
+   * Use this in contexts where you want to show only the current user's bookings
+   * (e.g. My Bookings view) instead of all users' bookings for the desk.
+   */
+  fetchBookings?: (start: string, end: string) => Promise<Booking[]>;
 }
 
 // ─── Component ────────────────────────────────────────────────────────────────
@@ -364,6 +371,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
   open, desk, roomName, onClose, onConfirm,
   myUsername, bookingApi, onLockFailed,
   editingBooking, onBookingUpdated, onEditBooking, onEditingDone,
+  fetchBookings,
 }) => {
   const styles = useStyles();
   const { preferences } = usePreferences();
@@ -584,7 +592,10 @@ export const BookingModal: React.FC<BookingModalProps> = ({
     setLoadingCal(true);
     const start = calDays[0];
     const end = calAddDays(calDays[calDays.length - 1], 1);
-    bookingApi.getDeskBookingsRange(desk.id, start.toISOString(), end.toISOString())
+    const fetcher = fetchBookings
+      ? () => fetchBookings(start.toISOString(), end.toISOString())
+      : () => bookingApi.getDeskBookingsRange(desk.id, start.toISOString(), end.toISOString());
+    fetcher()
       .then(data => setDeskBookings(data))
       .catch(() => setDeskBookings([]))
       .finally(() => setLoadingCal(false));
