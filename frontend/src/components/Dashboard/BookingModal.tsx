@@ -29,7 +29,7 @@ function dateToDateStr(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
 }
 
-// fmtTime is now replaced by usePreferences().formatTime — see component body
+// fmtTime: pure HH:MM → display formatter (no Date/timezone conversion needed)
 
 function fmtDate(d: string): string {
   return dateStrToDate(d).toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
@@ -366,7 +366,7 @@ export const BookingModal: React.FC<BookingModalProps> = ({
   editingBooking, onBookingUpdated, onEditBooking, onEditingDone,
 }) => {
   const styles = useStyles();
-  const { formatTime, preferences } = usePreferences();
+  const { preferences } = usePreferences();
   const userTz = preferences?.timezone ?? Intl.DateTimeFormat().resolvedOptions().timeZone;
 
   /**
@@ -400,12 +400,57 @@ export const BookingModal: React.FC<BookingModalProps> = ({
       };
     }
   };
-  // fmtTime: format an HH:MM string using the user's time_format preference
-  const fmtTime = (t: string) => {
+  /**
+   * Convert a local "YYYY-MM-DD" + "HH:MM" pair — interpreted as being in userTz —
+   * to a UTC ISO string for the API.
+   *
+   * Strategy: construct the naive local string, then use Intl to measure the
+   * UTC offset in userTz at that instant, and subtract it.
+   */
+  const localToUTC = (dateStr: string, timeStr: string): string => {
+    // Build a UTC probe at noon on that date, then read back the local time in userTz.
+    // The difference between noon UTC and the local noon gives us the UTC offset.
+    try {
+      const [h, m] = timeStr.split(':').map(Number);
+
+      // Step 1: guess UTC = naive local (may be off by offset, but close enough for step 2)
+      const naiveMs = new Date(`${dateStr}T${timeStr}:00Z`).getTime();
+
+      // Step 2: ask Intl what local time that UTC instant corresponds to in userTz
+      const probe = new Date(naiveMs);
+      const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone: userTz,
+        hour: 'numeric', minute: 'numeric', second: 'numeric', hour12: false,
+      }).formatToParts(probe);
+      const localH = Number(parts.find(p => p.type === 'hour')?.value   ?? 0);
+      const localM = Number(parts.find(p => p.type === 'minute')?.value ?? 0);
+
+      // Step 3: offset = local - UTC (in minutes)
+      const utcH = probe.getUTCHours();
+      const utcM = probe.getUTCMinutes();
+      const offsetMin = ((localH === 24 ? 0 : localH) - utcH) * 60 + (localM - utcM);
+
+      // Step 4: actual UTC = naive local − offset
+      return new Date(naiveMs - offsetMin * 60_000).toISOString();
+    } catch {
+      // Fallback: treat as browser local time
+      return new Date(`${dateStr}T${timeStr}:00`).toISOString();
+    }
+  };
+
+  // fmtTime: format an HH:MM string (already in user's timezone) for display.
+  // MUST NOT construct a Date — HH:MM is a plain hour/minute pair in user-tz,
+  // not a UTC timestamp. Using new Date + setHours would interpret it in browser
+  // local time then re-apply user-tz via Intl, producing a double-shift.
+  const timeFormat = preferences?.time_format ?? '24';
+  const fmtTime = (t: string): string => {
     const [h, m] = t.split(':').map(Number);
-    const d = new Date();
-    d.setHours(h, m, 0, 0);
-    return formatTime(d);
+    if (timeFormat === '24') return t;                          // already "HH:MM"
+    if (h === 0)  return `12:${String(m).padStart(2,'0')} AM`;
+    if (h === 12) return `12:${String(m).padStart(2,'0')} PM`;
+    return h < 12
+      ? `${h}:${String(m).padStart(2,'0')} AM`
+      : `${h - 12}:${String(m).padStart(2,'0')} PM`;
   };
 
   // ── Booking range state ──
@@ -821,8 +866,8 @@ export const BookingModal: React.FC<BookingModalProps> = ({
       if (shortenTarget) {
         // Shorten an existing booking via edit_intervals (handles merging + partial deletes)
         const shortenResult = await bookingApi.editIntervals(shortenTarget.id, [{
-          start_time: new Date(`${startDate}T${startTime}:00`).toISOString(),
-          end_time:   new Date(`${endDate}T${endTime}:00`).toISOString(),
+          start_time: localToUTC(startDate, startTime),
+          end_time:   localToUTC(endDate, endTime),
         }]);
         // Surgical update: swap old booking for updated one(s) in the calendar
         setDeskBookings(prev => {
@@ -845,8 +890,8 @@ export const BookingModal: React.FC<BookingModalProps> = ({
       } else if (editingBooking) {
         // Full edit via PATCH (launched from the "Edit booking" popup in My Bookings)
         const updatedBooking = await bookingApi.updateBooking(editingBooking.id, {
-          start_time: new Date(`${startDate}T${startTime}:00`).toISOString(),
-          end_time:   new Date(`${endDate}T${endTime}:00`).toISOString(),
+          start_time: localToUTC(startDate, startTime),
+          end_time:   localToUTC(endDate, endTime),
         });
         // Surgical update: replace booking in calendar without re-fetching
         setDeskBookings(prev => prev.map(b => b.id === updatedBooking.id ? updatedBooking : b));
@@ -856,8 +901,8 @@ export const BookingModal: React.FC<BookingModalProps> = ({
       } else {
         const newBooking = await bookingApi.createBooking({
           desk_id: desk.id,
-          start_time: new Date(`${startDate}T${startTime}:00`).toISOString(),
-          end_time:   new Date(`${endDate}T${endTime}:00`).toISOString(),
+          start_time: localToUTC(startDate, startTime),
+          end_time:   localToUTC(endDate, endTime),
         });
         // Surgical insert — append the new booking to the calendar immediately
         setDeskBookings(prev => [...prev, newBooking]);
