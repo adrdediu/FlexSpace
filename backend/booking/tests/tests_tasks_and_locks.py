@@ -167,7 +167,8 @@ class TestDeskLockService:
 class TestExpireAndActivateBookings:
 
     def test_desk_cleared_after_booking_ends(self, desk, user):
-        _bk(user, desk, past(2), past(0.1))
+        # end_time must be within the last minute for the task to pick it up
+        _bk(user, desk, past(2), past(1/120))  # ended ~30 seconds ago
         Desk.objects.filter(pk=desk.pk).update(is_booked=True, booked_by=user)
 
         with patch("booking.tasks.get_channel_layer"), \
@@ -180,7 +181,8 @@ class TestExpireAndActivateBookings:
         assert desk.booked_by is None
 
     def test_desk_marked_booked_when_booking_starts(self, desk, user):
-        _bk(user, desk, past(0.1), future(3))
+        # start_time must be within the last minute for the task to pick it up
+        _bk(user, desk, past(1/120), future(3))  # started ~30 seconds ago
 
         with patch("booking.tasks.get_channel_layer"), \
              patch("booking.tasks.async_to_sync"):

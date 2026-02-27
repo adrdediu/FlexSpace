@@ -61,17 +61,18 @@ def expire_and_activate_bookings():
     now = timezone.now()
     one_minute_ago = now - timedelta(minutes=1)
 
-    ended_desks = Desk.objects.filter(
+    ended_desk_ids = Desk.objects.filter(
         bookings__end_time__gte=one_minute_ago,
         bookings__end_time__lte=now
-    ).distinct()
+    ).distinct().values_list('id', flat=True)
 
-    started_desks = Desk.objects.filter(
+    started_desk_ids = Desk.objects.filter(
         bookings__start_time__gte=one_minute_ago,
         bookings__start_time__lte=now
-    ).distinct()
+    ).distinct().values_list('id', flat=True)
 
-    desks_to_check = (ended_desks | started_desks).distinct()
+    all_desk_ids = list(ended_desk_ids) + list(started_desk_ids)
+    desks_to_check = Desk.objects.filter(id__in=all_desk_ids)
     channel_layer = get_channel_layer()
 
     # Refresh is booked for impacted desks

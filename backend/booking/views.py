@@ -1,5 +1,5 @@
 from django.conf import settings
-from django.forms import ValidationError
+from rest_framework.exceptions import ValidationError
 from django.db import transaction
 from typing import Optional
 from datetime import timedelta, timezone as dt_timezone

@@ -1,0 +1,1565 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <meta charset="utf-8"/>
+    <title id="head-title">FlexSpace Backend — Test Report</title>
+      <style type="text/css">body {
+  font-family: Helvetica, Arial, sans-serif;
+  font-size: 12px;
+  /* do not increase min-width as some may use split screens */
+  min-width: 800px;
+  color: #999;
+}
+
+h1 {
+  font-size: 24px;
+  color: black;
+}
+
+h2 {
+  font-size: 16px;
+  color: black;
+}
+
+p {
+  color: black;
+}
+
+a {
+  color: #999;
+}
+
+table {
+  border-collapse: collapse;
+}
+
+/******************************
+ * SUMMARY INFORMATION
+ ******************************/
+#environment td {
+  padding: 5px;
+  border: 1px solid #e6e6e6;
+  vertical-align: top;
+}
+#environment tr:nth-child(odd) {
+  background-color: #f6f6f6;
+}
+#environment ul {
+  margin: 0;
+  padding: 0 20px;
+}
+
+/******************************
+ * TEST RESULT COLORS
+ ******************************/
+span.passed,
+.passed .col-result {
+  color: green;
+}
+
+span.skipped,
+span.xfailed,
+span.rerun,
+.skipped .col-result,
+.xfailed .col-result,
+.rerun .col-result {
+  color: orange;
+}
+
+span.error,
+span.failed,
+span.xpassed,
+.error .col-result,
+.failed .col-result,
+.xpassed .col-result {
+  color: red;
+}
+
+.col-links__extra {
+  margin-right: 3px;
+}
+
+/******************************
+ * RESULTS TABLE
+ *
+ * 1. Table Layout
+ * 2. Extra
+ * 3. Sorting items
+ *
+ ******************************/
+/*------------------
+ * 1. Table Layout
+ *------------------*/
+#results-table {
+  border: 1px solid #e6e6e6;
+  color: #999;
+  font-size: 12px;
+  width: 100%;
+}
+#results-table th,
+#results-table td {
+  padding: 5px;
+  border: 1px solid #e6e6e6;
+  text-align: left;
+}
+#results-table th {
+  font-weight: bold;
+}
+
+/*------------------
+ * 2. Extra
+ *------------------*/
+.logwrapper {
+  max-height: 230px;
+  overflow-y: scroll;
+  background-color: #e6e6e6;
+}
+.logwrapper.expanded {
+  max-height: none;
+}
+.logwrapper.expanded .logexpander:after {
+  content: "collapse [-]";
+}
+.logwrapper .logexpander {
+  z-index: 1;
+  position: sticky;
+  top: 10px;
+  width: max-content;
+  border: 1px solid;
+  border-radius: 3px;
+  padding: 5px 7px;
+  margin: 10px 0 10px calc(100% - 80px);
+  cursor: pointer;
+  background-color: #e6e6e6;
+}
+.logwrapper .logexpander:after {
+  content: "expand [+]";
+}
+.logwrapper .logexpander:hover {
+  color: #000;
+  border-color: #000;
+}
+.logwrapper .log {
+  min-height: 40px;
+  position: relative;
+  top: -50px;
+  height: calc(100% + 50px);
+  border: 1px solid #e6e6e6;
+  color: black;
+  display: block;
+  font-family: "Courier New", Courier, monospace;
+  padding: 5px;
+  padding-right: 80px;
+  white-space: pre-wrap;
+}
+
+div.media {
+  border: 1px solid #e6e6e6;
+  float: right;
+  height: 240px;
+  margin: 0 5px;
+  overflow: hidden;
+  width: 320px;
+}
+
+.media-container {
+  display: grid;
+  grid-template-columns: 25px auto 25px;
+  align-items: center;
+  flex: 1 1;
+  overflow: hidden;
+  height: 200px;
+}
+
+.media-container--fullscreen {
+  grid-template-columns: 0px auto 0px;
+}
+
+.media-container__nav--right,
+.media-container__nav--left {
+  text-align: center;
+  cursor: pointer;
+}
+
+.media-container__viewport {
+  cursor: pointer;
+  text-align: center;
+  height: inherit;
+}
+.media-container__viewport img,
+.media-container__viewport video {
+  object-fit: cover;
+  width: 100%;
+  max-height: 100%;
+}
+
+.media__name,
+.media__counter {
+  display: flex;
+  flex-direction: row;
+  justify-content: space-around;
+  flex: 0 0 25px;
+  align-items: center;
+}
+
+.collapsible td:not(.col-links) {
+  cursor: pointer;
+}
+.collapsible td:not(.col-links):hover::after {
+  color: #bbb;
+  font-style: italic;
+  cursor: pointer;
+}
+
+.col-result {
+  width: 130px;
+}
+.col-result:hover::after {
+  content: " (hide details)";
+}
+
+.col-result.collapsed:hover::after {
+  content: " (show details)";
+}
+
+#environment-header h2:hover::after {
+  content: " (hide details)";
+  color: #bbb;
+  font-style: italic;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+#environment-header.collapsed h2:hover::after {
+  content: " (show details)";
+  color: #bbb;
+  font-style: italic;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+/*------------------
+ * 3. Sorting items
+ *------------------*/
+.sortable {
+  cursor: pointer;
+}
+.sortable.desc:after {
+  content: " ";
+  position: relative;
+  left: 5px;
+  bottom: -12.5px;
+  border: 10px solid #4caf50;
+  border-bottom: 0;
+  border-left-color: transparent;
+  border-right-color: transparent;
+}
+.sortable.asc:after {
+  content: " ";
+  position: relative;
+  left: 5px;
+  bottom: 12.5px;
+  border: 10px solid #4caf50;
+  border-top: 0;
+  border-left-color: transparent;
+  border-right-color: transparent;
+}
+
+.hidden, .summary__reload__button.hidden {
+  display: none;
+}
+
+.summary__data {
+  flex: 0 0 550px;
+}
+.summary__reload {
+  flex: 1 1;
+  display: flex;
+  justify-content: center;
+}
+.summary__reload__button {
+  flex: 0 0 300px;
+  display: flex;
+  color: white;
+  font-weight: bold;
+  background-color: #4caf50;
+  text-align: center;
+  justify-content: center;
+  align-items: center;
+  border-radius: 3px;
+  cursor: pointer;
+}
+.summary__reload__button:hover {
+  background-color: #46a049;
+}
+.summary__spacer {
+  flex: 0 0 550px;
+}
+
+.controls {
+  display: flex;
+  justify-content: space-between;
+}
+
+.filters,
+.collapse {
+  display: flex;
+  align-items: center;
+}
+.filters button,
+.collapse button {
+  color: #999;
+  border: none;
+  background: none;
+  cursor: pointer;
+  text-decoration: underline;
+}
+.filters button:hover,
+.collapse button:hover {
+  color: #ccc;
+}
+
+.filter__label {
+  margin-right: 10px;
+}
+
+/******************************
+ * CUSTOM CSS
+ * booking\tests\theme.css
+ ******************************/
+
+/*
+ * FlexSpace -- pytest-html v4.2.0 Dark Theme
+ * Usage: pytest --html=report.html --css=tests/theme.css
+ *
+ * v4 filter structure:
+ *   <input class="filter" type="checkbox" data-test-result="passed" />
+ *   <span class="filter passed">33 Passed</span>
+ *   (no associated <label> -- the checkbox and span are siblings)
+ */
+
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600&family=DM+Sans:wght@400;500;600;700&display=swap');
+
+/* =========================================================
+   TOKENS
+   ========================================================= */
+:root {
+  --bg:        #0d1117;
+  --surface:   #161b22;
+  --card:      #1c2333;
+  --border:    #30363d;
+  --border-lo: rgba(48,54,61,0.6);
+  --text:      #e6edf3;
+  --muted:     #7d8590;
+  --subtle:    #3d444d;
+
+  --pass:      #3fb950;
+  --fail:      #f85149;
+  --fail-bg:   rgba(248,81,73,0.07);
+  --error:     #ff7b72;
+  --skip:      #e3b341;
+  --xfail:     #bc8cff;
+  --xpass:     #56d364;
+  --accent:    #58a6ff;
+
+  --font-ui:   'DM Sans', 'Segoe UI', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Consolas', monospace;
+  --radius:    8px;
+}
+
+/* =========================================================
+   GLOBAL
+   ========================================================= */
+*, *::before, *::after { box-sizing: border-box; }
+html { scroll-behavior: smooth; }
+
+body {
+  background: var(--bg) !important;
+  color: var(--text) !important;
+  font-family: var(--font-ui) !important;
+  font-size: 14px !important;
+  line-height: 1.6 !important;
+  margin: 0 !important;
+  padding: 0 32px !important;
+  -webkit-font-smoothing: antialiased;
+}
+
+a { color: var(--accent); text-decoration: none; }
+a:hover { color: var(--accent); text-decoration: underline; }
+
+/* =========================================================
+   H1 TITLE
+   ========================================================= */
+h1 {
+  font-family: var(--font-ui) !important;
+  font-size: 20px !important;
+  font-weight: 700 !important;
+  color: var(--text) !important;
+  padding: 28px 0 4px !important;
+  margin: 0 !important;
+  border: none !important;
+  display: flex !important;
+  align-items: center !important;
+  gap: 10px !important;
+  letter-spacing: -0.3px !important;
+}
+
+h1::before {
+  content: 'FS';
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: var(--accent);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  border-radius: 7px;
+  flex-shrink: 0;
+}
+
+/* Generated-by line */
+body > p {
+  font-size: 12px !important;
+  color: var(--muted) !important;
+  margin: 2px 0 20px !important;
+}
+body > p a { color: var(--muted) !important; }
+body > p a:hover { color: var(--accent) !important; }
+
+/* =========================================================
+   H2 SECTION HEADINGS
+   ========================================================= */
+h2 {
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 1.2px !important;
+  color: var(--muted) !important;
+  margin: 0 0 14px !important;
+  padding: 0 !important;
+  border: none !important;
+}
+
+/* =========================================================
+   SECTION WRAPPERS
+   ========================================================= */
+#environment-wrapper,
+#summary-wrapper,
+#results-wrapper {
+  background: var(--surface) !important;
+  border: 1px solid var(--border) !important;
+  border-radius: var(--radius) !important;
+  padding: 20px 24px !important;
+  margin-bottom: 20px !important;
+}
+
+/* =========================================================
+   ENVIRONMENT TABLE
+   ========================================================= */
+#environment {
+  width: 100% !important;
+  border-collapse: collapse !important;
+  background: transparent !important;
+}
+
+#environment tr,
+#environment tr:nth-child(odd),
+#environment tr:nth-child(even),
+#environment tr:nth-of-type(odd),
+#environment tr:nth-of-type(even) {
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+#environment tr:hover td {
+  background: rgba(88,166,255,0.04) !important;
+}
+
+#environment td {
+  padding: 8px 12px !important;
+  border: none !important;
+  border-bottom: 1px solid var(--border-lo) !important;
+  font-size: 12px !important;
+  color: var(--text) !important;
+  background: transparent !important;
+  background-color: transparent !important;
+  vertical-align: top !important;
+}
+
+#environment tr:last-child td { border-bottom: none !important; }
+
+#environment td:first-child {
+  color: var(--muted) !important;
+  font-family: var(--font-mono) !important;
+  width: 200px !important;
+  white-space: nowrap !important;
+}
+
+#environment td ul { margin: 0 !important; padding: 0 0 0 16px !important; }
+#environment td ul li { font-size: 12px !important; color: var(--text) !important; line-height: 1.7 !important; }
+
+/* =========================================================
+   SUMMARY TEXT
+   ========================================================= */
+#summary-wrapper p {
+  font-size: 13px !important;
+  color: var(--muted) !important;
+  margin: 0 0 14px !important;
+}
+
+/* =========================================================
+   FILTER AREA
+   v4 structure:
+     <input class="filter" type="checkbox" data-test-result="passed">
+     <span class="filter passed">33 Passed</span>,
+     <input class="filter" type="checkbox" data-test-result="failed">
+     <span class="filter failed">0 Failed</span>, ...
+   ========================================================= */
+
+/* Container that holds all filters */
+#filter-container,
+.filter-container,
+[id*="filter-container"] {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+  gap: 8px !important;
+  margin-bottom: 16px !important;
+}
+
+/* The checkbox itself -- keep it visible and functional,
+   just resize and recolour it to match the dark theme */
+input.filter[type="checkbox"] {
+  appearance: auto !important;
+  -webkit-appearance: auto !important;
+  width: 15px !important;
+  height: 15px !important;
+  margin: 0 4px 0 0 !important;
+  cursor: pointer !important;
+  accent-color: var(--accent) !important;
+  vertical-align: middle !important;
+  flex-shrink: 0 !important;
+  /* Do NOT hide or set opacity/pointer-events -- v4 needs native clicks */
+}
+
+/* The span label next to the checkbox */
+span.filter {
+  font-size: 13px !important;
+  font-weight: 600 !important;
+  font-family: var(--font-ui) !important;
+  color: #ffffff !important;
+  cursor: pointer !important;
+  vertical-align: middle !important;
+  margin-right: 12px !important;
+}
+
+/* Per-outcome span colours */
+span.filter.passed  { color: var(--pass)  !important; }
+span.filter.failed  { color: var(--fail)  !important; }
+span.filter.error   { color: var(--error) !important; }
+span.filter.skipped { color: var(--skip)  !important; }
+span.filter.xfailed { color: var(--xfail) !important; }
+span.filter.xpassed { color: var(--xpass) !important; }
+span.filter.rerun   { color: var(--muted) !important; }
+
+/* Commas between filter items */
+#summary-wrapper span + span { margin-left: 4px !important; }
+
+/* Show / Hide all details buttons */
+#show_all_details,
+#hide_all_details {
+  display: inline-flex !important;
+  align-items: center !important;
+  padding: 5px 14px !important;
+  border-radius: 6px !important;
+  border: 1px solid var(--border) !important;
+  background: transparent !important;
+  color: var(--muted) !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+  font-family: var(--font-ui) !important;
+  cursor: pointer !important;
+  text-decoration: none !important;
+  transition: all 0.15s !important;
+  margin: 0 !important;
+  vertical-align: middle !important;
+}
+
+#show_all_details:hover,
+#hide_all_details:hover {
+  background: var(--card) !important;
+  color: var(--accent) !important;
+  border-color: var(--accent) !important;
+  text-decoration: none !important;
+}
+
+/* =========================================================
+   RESULTS TABLE
+   ========================================================= */
+#results-table {
+  width: 100% !important;
+  border-collapse: collapse !important;
+  background: transparent !important;
+  margin: 0 !important;
+}
+
+#results-table thead th {
+  background: var(--card) !important;
+  color: var(--muted) !important;
+  font-size: 11px !important;
+  font-weight: 600 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 1px !important;
+  padding: 11px 16px !important;
+  border: none !important;
+  border-bottom: 1px solid var(--border) !important;
+  text-align: left !important;
+  white-space: nowrap !important;
+}
+
+/* Kill ALL default row backgrounds */
+#results-table tbody tr,
+#results-table tbody tr:nth-child(odd),
+#results-table tbody tr:nth-child(even),
+#results-table tbody tr:nth-of-type(odd),
+#results-table tbody tr:nth-of-type(even) {
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+/* Outcome tints */
+#results-table tbody tr.failed  > td { background: var(--fail-bg) !important; }
+#results-table tbody tr.error   > td { background: rgba(255,123,114,0.07) !important; }
+#results-table tbody tr.skipped > td { background: rgba(227,179,65,0.05) !important; }
+
+#results-table tbody tr:not(.extras):hover > td {
+  background: rgba(88,166,255,0.04) !important;
+}
+
+#results-table tbody td {
+  padding: 10px 16px !important;
+  border: none !important;
+  border-bottom: 1px solid var(--border-lo) !important;
+  font-size: 13px !important;
+  vertical-align: middle !important;
+  color: var(--text) !important;
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+#results-table tbody tr:last-child > td { border-bottom: none !important; }
+
+/* Result badge */
+#results-table td.col-result {
+  font-weight: 700 !important;
+  font-size: 11px !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+  white-space: nowrap !important;
+}
+
+#results-table tr.passed  td.col-result { color: var(--pass)  !important; }
+#results-table tr.failed  td.col-result { color: var(--fail)  !important; }
+#results-table tr.error   td.col-result { color: var(--error) !important; }
+#results-table tr.skipped td.col-result { color: var(--skip)  !important; }
+#results-table tr.xfailed td.col-result { color: var(--xfail) !important; }
+#results-table tr.xpassed td.col-result { color: var(--xpass) !important; }
+
+#results-table td.col-result a {
+  font-size: 10px !important;
+  font-weight: 500 !important;
+  color: var(--muted) !important;
+  margin-left: 6px !important;
+  text-transform: none !important;
+  letter-spacing: 0 !important;
+}
+#results-table td.col-result a:hover { color: var(--accent) !important; }
+
+/* Test name */
+#results-table td.col-name {
+  font-family: var(--font-mono) !important;
+  font-size: 12px !important;
+  word-break: break-all !important;
+}
+
+/* Duration */
+#results-table td.col-duration {
+  font-family: var(--font-mono) !important;
+  font-size: 12px !important;
+  color: var(--muted) !important;
+  white-space: nowrap !important;
+}
+
+/* =========================================================
+   EXTRAS / LOG ROWS  (expanded details)
+   ========================================================= */
+#results-table tr.extras,
+#results-table tr.extras td,
+#results-table tr.extra,
+#results-table tr.extra td {
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+#results-table tr.extras > td,
+#results-table tr.extra > td {
+  padding: 0 16px 16px !important;
+  border-bottom: 1px solid var(--border-lo) !important;
+}
+
+/* Any div wrapper inside extras */
+#results-table tr.extras td > div,
+#results-table tr.extra td > div {
+  background: transparent !important;
+  background-color: transparent !important;
+}
+
+/* Log / traceback block */
+div.log,
+.log {
+  background: #0d1117 !important;
+  background-color: #0d1117 !important;
+  border: 1px solid var(--border) !important;
+  border-left: 3px solid var(--fail) !important;
+  border-radius: 6px !important;
+  padding: 12px 14px !important;
+  font-family: var(--font-mono) !important;
+  font-size: 11.5px !important;
+  line-height: 1.55 !important;
+  color: #fca5a5 !important;
+  white-space: pre-wrap !important;
+  overflow-x: auto !important;
+  margin: 0 !important;
+  scrollbar-color: var(--subtle) transparent;
+  scrollbar-width: thin;
+}
+
+div.log::-webkit-scrollbar { width: 6px; height: 6px; }
+div.log::-webkit-scrollbar-track { background: transparent; }
+div.log::-webkit-scrollbar-thumb { background: var(--subtle); border-radius: 3px; }
+div.log::-webkit-scrollbar-thumb:hover { background: var(--muted); }
+
+tr.skipped div.log { border-left-color: var(--skip)  !important; color: #fde68a !important; }
+tr.passed  div.log { border-left-color: var(--pass)  !important; color: #86efac !important; }
+tr.error   div.log { border-left-color: var(--error) !important; }
+
+/* =========================================================
+   RESPONSIVE
+   ========================================================= */
+@media (max-width: 768px) {
+  body { padding: 0 12px !important; }
+  #results-table thead th,
+  #results-table tbody td { padding: 9px 10px !important; }
+  #results-table td.col-name { max-width: 200px !important; }
+}
+
+body > div.summary > div.summary__data > p.filter {
+    color:white;
+}
+
+body > div.summary > div.summary__data > p.run-count {
+    color:white;
+}
+
+.filters > input.filter:not(:first-child) {
+  margin-left: 16px !important;
+}
+
+.logwrapper {
+    max-height: 230px;
+    overflow-y: scroll;
+    background-color: transparent;
+}
+
+#results-table {
+     border: 1px solid transparent;
+    color: #999;
+    font-size: 12px;
+    width: 100%;
+    border-radius: 14px;
+    background-color:transparent;
+}
+
+.logwrapper .logexpander {
+    z-index: 1;
+    position: sticky;
+    top: 10px;
+    width: max-content;
+    border: 1px solid;
+    border-radius: 3px;
+    padding: 5px 7px;
+    margin: 10px 0 10px calc(100% - 80px);
+    cursor: pointer;
+    background-color:transparent;
+}
+      </style>
+    
+  </head>
+  <body>
+    <h1 id="title">FlexSpace Backend — Test Report</h1>
+    <p>Report generated on 27-Feb-2026 at 15:42:25 by <a href="https://pypi.python.org/pypi/pytest-html">pytest-html</a>
+        v4.2.0</p>
+    <div id="environment-header">
+      <h2>Environment</h2>
+    </div>
+    <table id="environment"></table>
+    <!-- TEMPLATES -->
+      <template id="template_environment_row">
+      <tr>
+        <td></td>
+        <td></td>
+      </tr>
+    </template>
+    <template id="template_results-table__body--empty">
+      <tbody class="results-table-row">
+        <tr id="not-found-message">
+          <td colspan="4">No results found. Check the filters.</td>
+        </tr>
+      </tbody>
+    </template>
+    <template id="template_results-table__tbody">
+      <tbody class="results-table-row">
+        <tr class="collapsible">
+        </tr>
+        <tr class="extras-row">
+          <td class="extra" colspan="4">
+            <div class="extraHTML"></div>
+            <div class="media">
+              <div class="media-container">
+                  <div class="media-container__nav--left">&lt;</div>
+                  <div class="media-container__viewport">
+                    <img src="" />
+                    <video controls>
+                      <source src="" type="video/mp4">
+                    </video>
+                  </div>
+                  <div class="media-container__nav--right">&gt;</div>
+                </div>
+                <div class="media__name"></div>
+                <div class="media__counter"></div>
+            </div>
+            <div class="logwrapper">
+              <div class="logexpander"></div>
+              <div class="log"></div>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </template>
+    <!-- END TEMPLATES -->
+    <div class="summary">
+      <div class="summary__data">
+        <h2>Summary</h2>
+        <div class="additional-summary prefix">
+        </div>
+        <p class="run-count">128 tests took 00:01:03.</p>
+        <p class="filter">(Un)check the boxes to filter the results.</p>
+        <div class="summary__reload">
+          <div class="summary__reload__button hidden" onclick="location.reload()">
+            <div>There are still tests running. <br />Reload this page to get the latest results!</div>
+          </div>
+        </div>
+        <div class="summary__spacer"></div>
+        <div class="controls">
+          <div class="filters">
+            <input checked="true" class="filter" name="filter_checkbox" type="checkbox" data-test-result="failed" disabled>
+            <span class="failed">0 Failed,</span>
+            <input checked="true" class="filter" name="filter_checkbox" type="checkbox" data-test-result="passed" >
+            <span class="passed">128 Passed,</span>
+            <input checked="true" class="filter" name="filter_checkbox" type="checkbox" data-test-result="skipped" disabled>
+            <span class="skipped">0 Skipped,</span>
+            <input checked="true" class="filter" name="filter_checkbox" type="checkbox" data-test-result="xfailed" disabled>
+            <span class="xfailed">0 Expected failures,</span>
+            <input checked="true" class="filter" name="filter_checkbox" type="checkbox" data-test-result="xpassed" disabled>
+            <span class="xpassed">0 Unexpected passes,</span>
+            <input checked="true" class="filter" name="filter_checkbox" type="checkbox" data-test-result="error" disabled>
+            <span class="error">0 Errors,</span>
+            <input checked="true" class="filter" name="filter_checkbox" type="checkbox" data-test-result="rerun" disabled>
+            <span class="rerun">0 Reruns</span>
+            <input checked="true" class="filter" name="filter_checkbox" type="checkbox" data-test-result="retried" disabled>
+            <span class="retried">0 Retried,</span>
+          </div>
+          <div class="collapse">
+            <button id="show_all_details">Show all details</button>&nbsp;/&nbsp;<button id="hide_all_details">Hide all details</button>
+          </div>
+        </div>
+      </div>
+      <div class="additional-summary summary">
+      </div>
+      <div class="additional-summary postfix">
+      </div>
+    </div>
+    <table id="results-table">
+      <thead id="results-table-head">
+        <tr>
+          <th class="sortable" data-column-type="result">Result</th>
+          <th class="sortable" data-column-type="testId">Test</th>
+          <th class="sortable" data-column-type="duration">Duration</th>
+          <th>Links</th>
+        </tr>
+      </thead>
+    </table>
+  <footer>
+    <div id="data-container" data-jsonblob="{&#34;environment&#34;: {&#34;Python&#34;: &#34;3.14.3&#34;, &#34;Platform&#34;: &#34;Windows-11-10.0.26200-SP0&#34;, &#34;Packages&#34;: {&#34;pytest&#34;: &#34;9.0.2&#34;, &#34;pluggy&#34;: &#34;1.6.0&#34;}, &#34;Plugins&#34;: {&#34;django&#34;: &#34;4.12.0&#34;, &#34;html&#34;: &#34;4.2.0&#34;, &#34;metadata&#34;: &#34;3.1.1&#34;}}, &#34;tests&#34;: {&#34;booking/tests/tests_api_admin.py::TestLocationManagement::test_superuser_can_create_location&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_api_admin.py::TestLocationManagement::test_superuser_can_create_location&#34;, &#34;duration&#34;: &#34;00:00:01&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_api_admin.py::TestLocationManagement::test_superuser_can_create_location&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;00:00:01&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;---------------------------- Captured stderr setup -----------------------------\nCreating test database for alias &amp;#x27;default&amp;#x27;...\r\n&#34;}], &#34;booking/tests/tests_api_admin.py::TestLocationManagement::test_regular_user_cannot_create_location&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_api_admin.py::TestLocationManagement::test_regular_user_cannot_create_location&#34;, &#34;duration&#34;: &#34;372 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_api_admin.py::TestLocationManagement::test_regular_user_cannot_create_location&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;372 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;------------------------------ Captured log call -------------------------------\nWARNING  django.request:log.py:249 Forbidden: /api/admin/locations/\n\n&#34;}], &#34;booking/tests/tests_api_admin.py::TestLocationManagement::test_superuser_can_delete_location&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_api_admin.py::TestLocationManagement::test_superuser_can_delete_location&#34;, &#34;duration&#34;: &#34;383 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_api_admin.py::TestLocationManagement::test_superuser_can_delete_location&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;383 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_api_admin.py::TestLocationManagement::test_location_manager_cannot_delete_location&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_api_admin.py::TestLocationManagement::test_location_manager_cannot_delete_location&#34;, &#34;duration&#34;: &#34;374 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_api_admin.py::TestLocationManagement::test_location_manager_cannot_delete_location&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;374 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;------------------------------ Captured log call -------------------------------\nWARNING  django.request:log.py:249 Forbidden: /api/admin/locations/1/\n\n&#34;}], &#34;booking/tests/tests_api_admin.py::TestLocationManagement::test_location_manager_can_retrieve_their_location&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_api_admin.py::TestLocationManagement::test_location_manager_can_retrieve_their_location&#34;, &#34;duration&#34;: &#34;372 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_api_admin.py::TestLocationManagement::test_location_manager_can_retrieve_their_location&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;372 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_api_admin.py::TestLocationManagement::test_non_manager_cannot_see_location_in_admin_view&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_api_admin.py::TestLocationManagement::test_non_manager_cannot_see_location_in_admin_view&#34;, &#34;duration&#34;: &#34;378 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_api_admin.py::TestLocationManagement::test_non_manager_cannot_see_location_in_admin_view&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;378 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;------------------------------ Captured log call -------------------------------\nWARNING  django.request:log.py:249 Not Found: /api/admin/locations/1/\n\n&#34;}], &#34;booking/tests/tests_api_admin.py::TestLocationManagement::test_add_managers_to_location&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_api_admin.py::TestLocationManagement::test_add_managers_to_location&#34;, &#34;duration&#34;: &#34;740 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_api_admin.py::TestLocationManagement::test_add_managers_to_location&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;740 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_api_admin.py::TestLocationManagement::test_remove_managers_from_location&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_api_admin.py::TestLocationManagement::test_remove_managers_from_location&#34;, &#34;duration&#34;: &#34;745 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_api_admin.py::TestLocationManagement::test_remove_managers_from_location&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;745 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_api_admin.py::TestLocationManagement::test_set_allowed_groups_restricts_location&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_api_admin.py::TestLocationManagement::test_set_allowed_groups_restricts_location&#34;, &#34;duration&#34;: &#34;761 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_api_admin.py::TestLocationManagement::test_set_allowed_groups_restricts_location&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;761 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_api_admin.py::TestLocationManagement::test_toggle_room_manager_permissions_on&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_api_admin.py::TestLocationManagement::test_toggle_room_manager_permissions_on&#34;, &#34;duration&#34;: &#34;377 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_api_admin.py::TestLocationManagement::test_toggle_room_manager_permissions_on&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;377 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_api_admin.py::TestLocationManagement::test_toggle_room_manager_permissions_off&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_api_admin.py::TestLocationManagement::test_toggle_room_manager_permissions_off&#34;, &#34;duration&#34;: &#34;377 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_api_admin.py::TestLocationManagement::test_toggle_room_manager_permissions_off&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;377 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_api_admin.py::TestRoomManagement::test_location_manager_can_create_room&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_api_admin.py::TestRoomManagement::test_location_manager_can_create_room&#34;, &#34;duration&#34;: &#34;380 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_api_admin.py::TestRoomManagement::test_location_manager_can_create_room&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;380 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_api_admin.py::TestRoomManagement::test_regular_user_cannot_create_room&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_api_admin.py::TestRoomManagement::test_regular_user_cannot_create_room&#34;, &#34;duration&#34;: &#34;376 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_api_admin.py::TestRoomManagement::test_regular_user_cannot_create_room&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;376 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;------------------------------ Captured log call -------------------------------\nWARNING  django.request:log.py:249 Forbidden: /api/admin/rooms/\n\n&#34;}], &#34;booking/tests/tests_api_admin.py::TestRoomManagement::test_add_room_managers&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_api_admin.py::TestRoomManagement::test_add_room_managers&#34;, &#34;duration&#34;: &#34;751 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_api_admin.py::TestRoomManagement::test_add_room_managers&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;751 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_api_admin.py::TestRoomManagement::test_remove_room_managers&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_api_admin.py::TestRoomManagement::test_remove_room_managers&#34;, &#34;duration&#34;: &#34;750 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_api_admin.py::TestRoomManagement::test_remove_room_managers&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;750 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_api_admin.py::TestRoomManagement::test_set_allowed_groups_on_room&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_api_admin.py::TestRoomManagement::test_set_allowed_groups_on_room&#34;, &#34;duration&#34;: &#34;743 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_api_admin.py::TestRoomManagement::test_set_allowed_groups_on_room&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;743 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_api_admin.py::TestRoomManagement::test_room_manager_can_enable_maintenance&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_api_admin.py::TestRoomManagement::test_room_manager_can_enable_maintenance&#34;, &#34;duration&#34;: &#34;379 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_api_admin.py::TestRoomManagement::test_room_manager_can_enable_maintenance&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;379 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_api_admin.py::TestRoomManagement::test_room_manager_can_clear_maintenance&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_api_admin.py::TestRoomManagement::test_room_manager_can_clear_maintenance&#34;, &#34;duration&#34;: &#34;395 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_api_admin.py::TestRoomManagement::test_room_manager_can_clear_maintenance&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;395 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_api_admin.py::TestRoomManagement::test_non_manager_cannot_enable_maintenance&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_api_admin.py::TestRoomManagement::test_non_manager_cannot_enable_maintenance&#34;, &#34;duration&#34;: &#34;384 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_api_admin.py::TestRoomManagement::test_non_manager_cannot_enable_maintenance&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;384 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;------------------------------ Captured log call -------------------------------\nWARNING  django.request:log.py:249 Not Found: /api/admin/rooms/1/set-maintenance/\n\n&#34;}], &#34;booking/tests/tests_api_admin.py::TestPermanentDeskAssignment::test_room_manager_can_assign_permanent_desk&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_api_admin.py::TestPermanentDeskAssignment::test_room_manager_can_assign_permanent_desk&#34;, &#34;duration&#34;: &#34;752 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_api_admin.py::TestPermanentDeskAssignment::test_room_manager_can_assign_permanent_desk&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;752 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_api_admin.py::TestPermanentDeskAssignment::test_regular_user_cannot_assign_permanent_desk&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_api_admin.py::TestPermanentDeskAssignment::test_regular_user_cannot_assign_permanent_desk&#34;, &#34;duration&#34;: &#34;752 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_api_admin.py::TestPermanentDeskAssignment::test_regular_user_cannot_assign_permanent_desk&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;752 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;------------------------------ Captured log call -------------------------------\nWARNING  django.request:log.py:249 Forbidden: /api/desks/1/assign-permanent/\n\n&#34;}], &#34;booking/tests/tests_api_admin.py::TestPermanentDeskAssignment::test_assign_permanent_missing_user_id_returns_400&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_api_admin.py::TestPermanentDeskAssignment::test_assign_permanent_missing_user_id_returns_400&#34;, &#34;duration&#34;: &#34;372 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_api_admin.py::TestPermanentDeskAssignment::test_assign_permanent_missing_user_id_returns_400&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;372 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;------------------------------ Captured log call -------------------------------\nWARNING  django.request:log.py:249 Bad Request: /api/desks/1/assign-permanent/\n\n&#34;}], &#34;booking/tests/tests_api_admin.py::TestPermanentDeskAssignment::test_assign_permanent_nonexistent_user_returns_404&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_api_admin.py::TestPermanentDeskAssignment::test_assign_permanent_nonexistent_user_returns_404&#34;, &#34;duration&#34;: &#34;373 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_api_admin.py::TestPermanentDeskAssignment::test_assign_permanent_nonexistent_user_returns_404&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;373 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;------------------------------ Captured log call -------------------------------\nWARNING  django.request:log.py:249 Not Found: /api/desks/1/assign-permanent/\n\n&#34;}], &#34;booking/tests/tests_api_admin.py::TestPermanentDeskAssignment::test_room_manager_can_clear_permanent_assignment&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_api_admin.py::TestPermanentDeskAssignment::test_room_manager_can_clear_permanent_assignment&#34;, &#34;duration&#34;: &#34;746 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_api_admin.py::TestPermanentDeskAssignment::test_room_manager_can_clear_permanent_assignment&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;746 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_api_admin.py::TestPermanentDeskAssignment::test_only_assignee_can_book_permanent_desk&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_api_admin.py::TestPermanentDeskAssignment::test_only_assignee_can_book_permanent_desk&#34;, &#34;duration&#34;: &#34;00:00:01&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_api_admin.py::TestPermanentDeskAssignment::test_only_assignee_can_book_permanent_desk&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;00:00:01&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;------------------------------ Captured log call -------------------------------\nWARNING  django.request:log.py:249 Bad Request: /api/bookings/\n\n&#34;}], &#34;booking/tests/tests_api_admin.py::TestUserGroupManagement::test_location_manager_can_create_group&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_api_admin.py::TestUserGroupManagement::test_location_manager_can_create_group&#34;, &#34;duration&#34;: &#34;372 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_api_admin.py::TestUserGroupManagement::test_location_manager_can_create_group&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;372 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_api_admin.py::TestUserGroupManagement::test_regular_user_cannot_create_group&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_api_admin.py::TestUserGroupManagement::test_regular_user_cannot_create_group&#34;, &#34;duration&#34;: &#34;370 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_api_admin.py::TestUserGroupManagement::test_regular_user_cannot_create_group&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;370 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;------------------------------ Captured log call -------------------------------\nWARNING  django.request:log.py:249 Forbidden: /api/usergroups/\n\n&#34;}], &#34;booking/tests/tests_api_admin.py::TestUserGroupManagement::test_location_manager_can_add_members&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_api_admin.py::TestUserGroupManagement::test_location_manager_can_add_members&#34;, &#34;duration&#34;: &#34;749 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_api_admin.py::TestUserGroupManagement::test_location_manager_can_add_members&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;749 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_api_admin.py::TestUserGroupManagement::test_location_manager_can_remove_members&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_api_admin.py::TestUserGroupManagement::test_location_manager_can_remove_members&#34;, &#34;duration&#34;: &#34;745 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_api_admin.py::TestUserGroupManagement::test_location_manager_can_remove_members&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;745 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_api_admin.py::TestUserGroupManagement::test_room_manager_can_add_members_when_flag_enabled&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_api_admin.py::TestUserGroupManagement::test_room_manager_can_add_members_when_flag_enabled&#34;, &#34;duration&#34;: &#34;00:00:01&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_api_admin.py::TestUserGroupManagement::test_room_manager_can_add_members_when_flag_enabled&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;00:00:01&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_api_admin.py::TestUserGroupManagement::test_room_manager_blocked_when_flag_disabled&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_api_admin.py::TestUserGroupManagement::test_room_manager_blocked_when_flag_disabled&#34;, &#34;duration&#34;: &#34;00:00:01&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_api_admin.py::TestUserGroupManagement::test_room_manager_blocked_when_flag_disabled&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;00:00:01&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;------------------------------ Captured log call -------------------------------\nWARNING  django.request:log.py:249 Forbidden: /api/usergroups/1/add_members/\n\n&#34;}], &#34;booking/tests/tests_api_admin.py::TestUserGroupManagement::test_location_manager_can_delete_group&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_api_admin.py::TestUserGroupManagement::test_location_manager_can_delete_group&#34;, &#34;duration&#34;: &#34;377 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_api_admin.py::TestUserGroupManagement::test_location_manager_can_delete_group&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;377 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_api_admin.py::TestUserGroupManagement::test_regular_user_cannot_delete_group&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_api_admin.py::TestUserGroupManagement::test_regular_user_cannot_delete_group&#34;, &#34;duration&#34;: &#34;370 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_api_admin.py::TestUserGroupManagement::test_regular_user_cannot_delete_group&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;370 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;------------------------------ Captured log call -------------------------------\nWARNING  django.request:log.py:249 Not Found: /api/usergroups/1/\n\n&#34;}], &#34;booking/tests/tests_api_bookings.py::TestBookingCreate::test_authorised_user_creates_booking&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_api_bookings.py::TestBookingCreate::test_authorised_user_creates_booking&#34;, &#34;duration&#34;: &#34;400 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_api_bookings.py::TestBookingCreate::test_authorised_user_creates_booking&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;400 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_api_bookings.py::TestBookingCreate::test_unauthenticated_request_rejected&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_api_bookings.py::TestBookingCreate::test_unauthenticated_request_rejected&#34;, &#34;duration&#34;: &#34;3 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_api_bookings.py::TestBookingCreate::test_unauthenticated_request_rejected&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;3 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;------------------------------ Captured log call -------------------------------\nWARNING  django.request:log.py:249 Unauthorized: /api/bookings/\n\n&#34;}], &#34;booking/tests/tests_api_bookings.py::TestBookingCreate::test_past_start_time_rejected&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_api_bookings.py::TestBookingCreate::test_past_start_time_rejected&#34;, &#34;duration&#34;: &#34;382 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_api_bookings.py::TestBookingCreate::test_past_start_time_rejected&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;382 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;------------------------------ Captured log call -------------------------------\nWARNING  django.request:log.py:249 Bad Request: /api/bookings/\n\n&#34;}], &#34;booking/tests/tests_api_bookings.py::TestBookingCreate::test_end_before_start_rejected&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_api_bookings.py::TestBookingCreate::test_end_before_start_rejected&#34;, &#34;duration&#34;: &#34;379 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_api_bookings.py::TestBookingCreate::test_end_before_start_rejected&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;379 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;------------------------------ Captured log call -------------------------------\nWARNING  django.request:log.py:249 Bad Request: /api/bookings/\n\n&#34;}], &#34;booking/tests/tests_api_bookings.py::TestBookingCreate::test_overlapping_booking_rejected&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_api_bookings.py::TestBookingCreate::test_overlapping_booking_rejected&#34;, &#34;duration&#34;: &#34;770 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_api_bookings.py::TestBookingCreate::test_overlapping_booking_rejected&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;770 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;------------------------------ Captured log call -------------------------------\nWARNING  django.request:log.py:249 Bad Request: /api/bookings/\n\n&#34;}], &#34;booking/tests/tests_api_bookings.py::TestBookingCreate::test_room_gate_blocks_user_without_group&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_api_bookings.py::TestBookingCreate::test_room_gate_blocks_user_without_group&#34;, &#34;duration&#34;: &#34;381 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_api_bookings.py::TestBookingCreate::test_room_gate_blocks_user_without_group&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;381 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;------------------------------ Captured log call -------------------------------\nWARNING  django.request:log.py:249 Bad Request: /api/bookings/\n\n&#34;}], &#34;booking/tests/tests_api_bookings.py::TestBookingCreate::test_location_gate_blocks_user_not_in_location_group&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_api_bookings.py::TestBookingCreate::test_location_gate_blocks_user_not_in_location_group&#34;, &#34;duration&#34;: &#34;749 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_api_bookings.py::TestBookingCreate::test_location_gate_blocks_user_not_in_location_group&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;749 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;------------------------------ Captured log call -------------------------------\nWARNING  django.request:log.py:249 Bad Request: /api/bookings/\n\n&#34;}], &#34;booking/tests/tests_api_bookings.py::TestBookingCreate::test_permanent_desk_blocks_non_assignee&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_api_bookings.py::TestBookingCreate::test_permanent_desk_blocks_non_assignee&#34;, &#34;duration&#34;: &#34;747 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_api_bookings.py::TestBookingCreate::test_permanent_desk_blocks_non_assignee&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;747 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;------------------------------ Captured log call -------------------------------\nWARNING  django.request:log.py:249 Bad Request: /api/bookings/\n\n&#34;}], &#34;booking/tests/tests_api_bookings.py::TestBookingCreate::test_superuser_bypasses_all_access_gates&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_api_bookings.py::TestBookingCreate::test_superuser_bypasses_all_access_gates&#34;, &#34;duration&#34;: &#34;411 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_api_bookings.py::TestBookingCreate::test_superuser_bypasses_all_access_gates&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;411 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_api_bookings.py::TestBookingRead::test_user_only_filter_returns_only_own_bookings&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_api_bookings.py::TestBookingRead::test_user_only_filter_returns_only_own_bookings&#34;, &#34;duration&#34;: &#34;746 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_api_bookings.py::TestBookingRead::test_user_only_filter_returns_only_own_bookings&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;746 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_api_bookings.py::TestBookingRead::test_date_range_filter_excludes_out_of_window_bookings&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_api_bookings.py::TestBookingRead::test_date_range_filter_excludes_out_of_window_bookings&#34;, &#34;duration&#34;: &#34;379 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_api_bookings.py::TestBookingRead::test_date_range_filter_excludes_out_of_window_bookings&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;379 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_api_bookings.py::TestBookingRead::test_desk_filter_returns_only_bookings_for_that_desk&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_api_bookings.py::TestBookingRead::test_desk_filter_returns_only_bookings_for_that_desk&#34;, &#34;duration&#34;: &#34;379 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_api_bookings.py::TestBookingRead::test_desk_filter_returns_only_bookings_for_that_desk&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;379 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_api_bookings.py::TestBookingDelete::test_user_can_cancel_own_booking&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_api_bookings.py::TestBookingDelete::test_user_can_cancel_own_booking&#34;, &#34;duration&#34;: &#34;405 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_api_bookings.py::TestBookingDelete::test_user_can_cancel_own_booking&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;405 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_api_bookings.py::TestBookingDelete::test_user_cannot_cancel_another_users_booking&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_api_bookings.py::TestBookingDelete::test_user_cannot_cancel_another_users_booking&#34;, &#34;duration&#34;: &#34;764 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_api_bookings.py::TestBookingDelete::test_user_cannot_cancel_another_users_booking&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;764 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_api_bookings.py::TestBookingDelete::test_superuser_can_cancel_any_booking&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_api_bookings.py::TestBookingDelete::test_superuser_can_cancel_any_booking&#34;, &#34;duration&#34;: &#34;760 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_api_bookings.py::TestBookingDelete::test_superuser_can_cancel_any_booking&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;760 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_api_bookings.py::TestBookingUpdate::test_user_can_extend_own_booking&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_api_bookings.py::TestBookingUpdate::test_user_can_extend_own_booking&#34;, &#34;duration&#34;: &#34;403 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_api_bookings.py::TestBookingUpdate::test_user_can_extend_own_booking&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;403 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_api_bookings.py::TestBookingUpdate::test_update_rejected_when_new_range_overlaps_other_booking&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_api_bookings.py::TestBookingUpdate::test_update_rejected_when_new_range_overlaps_other_booking&#34;, &#34;duration&#34;: &#34;745 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_api_bookings.py::TestBookingUpdate::test_update_rejected_when_new_range_overlaps_other_booking&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;745 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;------------------------------ Captured log call -------------------------------\nWARNING  django.request:log.py:249 Conflict: /api/bookings/1/\n\n&#34;}], &#34;booking/tests/tests_api_bookings.py::TestBookingUpdate::test_can_extend_active_booking_without_changing_past_start&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_api_bookings.py::TestBookingUpdate::test_can_extend_active_booking_without_changing_past_start&#34;, &#34;duration&#34;: &#34;400 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_api_bookings.py::TestBookingUpdate::test_can_extend_active_booking_without_changing_past_start&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;400 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_api_bookings.py::TestDeskLock::test_lock_succeeds_on_free_desk&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_api_bookings.py::TestDeskLock::test_lock_succeeds_on_free_desk&#34;, &#34;duration&#34;: &#34;376 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_api_bookings.py::TestDeskLock::test_lock_succeeds_on_free_desk&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;376 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_api_bookings.py::TestDeskLock::test_lock_returns_423_when_desk_held_by_other&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_api_bookings.py::TestDeskLock::test_lock_returns_423_when_desk_held_by_other&#34;, &#34;duration&#34;: &#34;374 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_api_bookings.py::TestDeskLock::test_lock_returns_423_when_desk_held_by_other&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;374 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;------------------------------ Captured log call -------------------------------\nWARNING  django.request:log.py:249 Locked: /api/bookings/lock/\n\n&#34;}], &#34;booking/tests/tests_api_bookings.py::TestDeskLock::test_lock_requires_desk_id_field&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_api_bookings.py::TestDeskLock::test_lock_requires_desk_id_field&#34;, &#34;duration&#34;: &#34;373 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_api_bookings.py::TestDeskLock::test_lock_requires_desk_id_field&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;373 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;------------------------------ Captured log call -------------------------------\nWARNING  django.request:log.py:249 Bad Request: /api/bookings/lock/\n\n&#34;}], &#34;booking/tests/tests_api_bookings.py::TestDeskLock::test_unlock_succeeds_for_lock_owner&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_api_bookings.py::TestDeskLock::test_unlock_succeeds_for_lock_owner&#34;, &#34;duration&#34;: &#34;374 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_api_bookings.py::TestDeskLock::test_unlock_succeeds_for_lock_owner&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;374 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_api_bookings.py::TestDeskLock::test_unlock_returns_409_when_not_owner&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_api_bookings.py::TestDeskLock::test_unlock_returns_409_when_not_owner&#34;, &#34;duration&#34;: &#34;375 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_api_bookings.py::TestDeskLock::test_unlock_returns_409_when_not_owner&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;375 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;------------------------------ Captured log call -------------------------------\nWARNING  django.request:log.py:249 Conflict: /api/bookings/unlock/\n\n&#34;}], &#34;booking/tests/tests_api_bookings.py::TestDeskLock::test_refresh_lock_extends_ttl&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_api_bookings.py::TestDeskLock::test_refresh_lock_extends_ttl&#34;, &#34;duration&#34;: &#34;375 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_api_bookings.py::TestDeskLock::test_refresh_lock_extends_ttl&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;375 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_api_bookings.py::TestDeskLock::test_refresh_lock_returns_409_when_expired_or_not_owner&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_api_bookings.py::TestDeskLock::test_refresh_lock_returns_409_when_expired_or_not_owner&#34;, &#34;duration&#34;: &#34;372 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_api_bookings.py::TestDeskLock::test_refresh_lock_returns_409_when_expired_or_not_owner&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;372 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;------------------------------ Captured log call -------------------------------\nWARNING  django.request:log.py:249 Conflict: /api/bookings/refresh_lock/\n\n&#34;}], &#34;booking/tests/tests_api_bookings.py::TestBulkCreate::test_partial_mode_all_intervals_succeed&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_api_bookings.py::TestBulkCreate::test_partial_mode_all_intervals_succeed&#34;, &#34;duration&#34;: &#34;402 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_api_bookings.py::TestBulkCreate::test_partial_mode_all_intervals_succeed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;402 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_api_bookings.py::TestBulkCreate::test_partial_mode_reports_conflict_days_for_blocked_intervals&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_api_bookings.py::TestBulkCreate::test_partial_mode_reports_conflict_days_for_blocked_intervals&#34;, &#34;duration&#34;: &#34;758 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_api_bookings.py::TestBulkCreate::test_partial_mode_reports_conflict_days_for_blocked_intervals&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;758 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_api_bookings.py::TestBulkCreate::test_atomic_mode_rolls_back_all_on_any_conflict&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_api_bookings.py::TestBulkCreate::test_atomic_mode_rolls_back_all_on_any_conflict&#34;, &#34;duration&#34;: &#34;745 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_api_bookings.py::TestBulkCreate::test_atomic_mode_rolls_back_all_on_any_conflict&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;745 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;------------------------------ Captured log call -------------------------------\nWARNING  django.request:log.py:249 Conflict: /api/bookings/bulk_create/\n\n&#34;}], &#34;booking/tests/tests_api_bookings.py::TestBulkCreate::test_atomic_mode_returns_201_when_all_succeed&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_api_bookings.py::TestBulkCreate::test_atomic_mode_returns_201_when_all_succeed&#34;, &#34;duration&#34;: &#34;411 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_api_bookings.py::TestBulkCreate::test_atomic_mode_returns_201_when_all_succeed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;411 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_api_bookings.py::TestBulkCreate::test_rejects_past_start_time_in_interval&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_api_bookings.py::TestBulkCreate::test_rejects_past_start_time_in_interval&#34;, &#34;duration&#34;: &#34;380 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_api_bookings.py::TestBulkCreate::test_rejects_past_start_time_in_interval&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;380 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;------------------------------ Captured log call -------------------------------\nWARNING  django.request:log.py:249 Bad Request: /api/bookings/bulk_create/\n\n&#34;}], &#34;booking/tests/tests_api_bookings.py::TestBulkCreate::test_rejects_empty_intervals_list&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_api_bookings.py::TestBulkCreate::test_rejects_empty_intervals_list&#34;, &#34;duration&#34;: &#34;377 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_api_bookings.py::TestBulkCreate::test_rejects_empty_intervals_list&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;377 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;------------------------------ Captured log call -------------------------------\nWARNING  django.request:log.py:249 Bad Request: /api/bookings/bulk_create/\n\n&#34;}], &#34;booking/tests/tests_api_bookings.py::TestBulkCreate::test_room_gate_blocks_bulk_create&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_api_bookings.py::TestBulkCreate::test_room_gate_blocks_bulk_create&#34;, &#34;duration&#34;: &#34;372 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_api_bookings.py::TestBulkCreate::test_room_gate_blocks_bulk_create&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;372 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;------------------------------ Captured log call -------------------------------\nWARNING  django.request:log.py:249 Forbidden: /api/bookings/bulk_create/\n\n&#34;}], &#34;booking/tests/tests_api_bookings.py::TestEditIntervals::test_updates_end_time_of_base_booking&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_api_bookings.py::TestEditIntervals::test_updates_end_time_of_base_booking&#34;, &#34;duration&#34;: &#34;407 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_api_bookings.py::TestEditIntervals::test_updates_end_time_of_base_booking&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;407 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_api_bookings.py::TestEditIntervals::test_empty_intervals_deletes_booking&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_api_bookings.py::TestEditIntervals::test_empty_intervals_deletes_booking&#34;, &#34;duration&#34;: &#34;393 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_api_bookings.py::TestEditIntervals::test_empty_intervals_deletes_booking&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;393 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_api_bookings.py::TestEditIntervals::test_creates_additional_non_adjacent_interval&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_api_bookings.py::TestEditIntervals::test_creates_additional_non_adjacent_interval&#34;, &#34;duration&#34;: &#34;459 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_api_bookings.py::TestEditIntervals::test_creates_additional_non_adjacent_interval&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;459 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_api_bookings.py::TestEditIntervals::test_merges_overlapping_intervals_in_payload&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_api_bookings.py::TestEditIntervals::test_merges_overlapping_intervals_in_payload&#34;, &#34;duration&#34;: &#34;403 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_api_bookings.py::TestEditIntervals::test_merges_overlapping_intervals_in_payload&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;403 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_api_bookings.py::TestEditIntervals::test_merges_adjacent_intervals_in_payload&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_api_bookings.py::TestEditIntervals::test_merges_adjacent_intervals_in_payload&#34;, &#34;duration&#34;: &#34;392 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_api_bookings.py::TestEditIntervals::test_merges_adjacent_intervals_in_payload&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;392 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_api_bookings.py::TestEditIntervals::test_returns_409_when_new_interval_conflicts_with_other_user&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_api_bookings.py::TestEditIntervals::test_returns_409_when_new_interval_conflicts_with_other_user&#34;, &#34;duration&#34;: &#34;751 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_api_bookings.py::TestEditIntervals::test_returns_409_when_new_interval_conflicts_with_other_user&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;751 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;------------------------------ Captured log call -------------------------------\nWARNING  django.request:log.py:249 Conflict: /api/bookings/1/edit_intervals/\n\n&#34;}], &#34;booking/tests/tests_api_bookings.py::TestEditIntervals::test_returns_403_when_editing_another_users_booking&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_api_bookings.py::TestEditIntervals::test_returns_403_when_editing_another_users_booking&#34;, &#34;duration&#34;: &#34;737 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_api_bookings.py::TestEditIntervals::test_returns_403_when_editing_another_users_booking&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;737 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;------------------------------ Captured log call -------------------------------\nWARNING  django.request:log.py:249 Forbidden: /api/bookings/1/edit_intervals/\n\n&#34;}], &#34;booking/tests/tests_api_bookings.py::TestEditIntervals::test_superseded_own_bookings_removed_when_interval_expands&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_api_bookings.py::TestEditIntervals::test_superseded_own_bookings_removed_when_interval_expands&#34;, &#34;duration&#34;: &#34;407 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_api_bookings.py::TestEditIntervals::test_superseded_own_bookings_removed_when_interval_expands&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;407 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_models.py::TestBookingValidation::test_valid_future_booking_is_created&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_models.py::TestBookingValidation::test_valid_future_booking_is_created&#34;, &#34;duration&#34;: &#34;373 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_models.py::TestBookingValidation::test_valid_future_booking_is_created&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;373 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_models.py::TestBookingValidation::test_new_booking_rejects_past_start_time&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_models.py::TestBookingValidation::test_new_booking_rejects_past_start_time&#34;, &#34;duration&#34;: &#34;374 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_models.py::TestBookingValidation::test_new_booking_rejects_past_start_time&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;374 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_models.py::TestBookingValidation::test_rejects_end_time_before_start_time&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_models.py::TestBookingValidation::test_rejects_end_time_before_start_time&#34;, &#34;duration&#34;: &#34;373 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_models.py::TestBookingValidation::test_rejects_end_time_before_start_time&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;373 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_models.py::TestBookingValidation::test_rejects_equal_start_and_end_time&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_models.py::TestBookingValidation::test_rejects_equal_start_and_end_time&#34;, &#34;duration&#34;: &#34;373 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_models.py::TestBookingValidation::test_rejects_equal_start_and_end_time&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;373 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_models.py::TestBookingValidation::test_rejects_fully_contained_overlap&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_models.py::TestBookingValidation::test_rejects_fully_contained_overlap&#34;, &#34;duration&#34;: &#34;736 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_models.py::TestBookingValidation::test_rejects_fully_contained_overlap&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;736 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_models.py::TestBookingValidation::test_rejects_partial_overlap_leading_edge&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_models.py::TestBookingValidation::test_rejects_partial_overlap_leading_edge&#34;, &#34;duration&#34;: &#34;741 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_models.py::TestBookingValidation::test_rejects_partial_overlap_leading_edge&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;741 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_models.py::TestBookingValidation::test_rejects_partial_overlap_trailing_edge&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_models.py::TestBookingValidation::test_rejects_partial_overlap_trailing_edge&#34;, &#34;duration&#34;: &#34;738 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_models.py::TestBookingValidation::test_rejects_partial_overlap_trailing_edge&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;738 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_models.py::TestBookingValidation::test_rejects_wrapping_overlap&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_models.py::TestBookingValidation::test_rejects_wrapping_overlap&#34;, &#34;duration&#34;: &#34;742 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_models.py::TestBookingValidation::test_rejects_wrapping_overlap&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;742 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_models.py::TestBookingValidation::test_adjacent_booking_is_allowed&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_models.py::TestBookingValidation::test_adjacent_booking_is_allowed&#34;, &#34;duration&#34;: &#34;741 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_models.py::TestBookingValidation::test_adjacent_booking_is_allowed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;741 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_models.py::TestBookingValidation::test_sequential_bookings_by_same_user_on_same_desk&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_models.py::TestBookingValidation::test_sequential_bookings_by_same_user_on_same_desk&#34;, &#34;duration&#34;: &#34;376 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_models.py::TestBookingValidation::test_sequential_bookings_by_same_user_on_same_desk&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;376 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_models.py::TestBookingValidation::test_same_time_on_different_desks_is_allowed&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_models.py::TestBookingValidation::test_same_time_on_different_desks_is_allowed&#34;, &#34;duration&#34;: &#34;376 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_models.py::TestBookingValidation::test_same_time_on_different_desks_is_allowed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;376 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_models.py::TestBookingValidation::test_extending_active_booking_keeps_unchanged_past_start&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_models.py::TestBookingValidation::test_extending_active_booking_keeps_unchanged_past_start&#34;, &#34;duration&#34;: &#34;380 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_models.py::TestBookingValidation::test_extending_active_booking_keeps_unchanged_past_start&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;380 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_models.py::TestBookingValidation::test_moving_start_of_active_booking_to_new_past_time_is_rejected&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_models.py::TestBookingValidation::test_moving_start_of_active_booking_to_new_past_time_is_rejected&#34;, &#34;duration&#34;: &#34;369 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_models.py::TestBookingValidation::test_moving_start_of_active_booking_to_new_past_time_is_rejected&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;369 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_models.py::TestBookingValidation::test_permanent_desk_rejects_booking_by_non_assignee&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_models.py::TestBookingValidation::test_permanent_desk_rejects_booking_by_non_assignee&#34;, &#34;duration&#34;: &#34;734 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_models.py::TestBookingValidation::test_permanent_desk_rejects_booking_by_non_assignee&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;734 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_models.py::TestBookingValidation::test_permanent_desk_allows_booking_by_assignee&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_models.py::TestBookingValidation::test_permanent_desk_allows_booking_by_assignee&#34;, &#34;duration&#34;: &#34;374 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_models.py::TestBookingValidation::test_permanent_desk_allows_booking_by_assignee&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;374 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_models.py::TestDeskModel::test_permanent_desk_without_assignee_fails_full_clean&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_models.py::TestDeskModel::test_permanent_desk_without_assignee_fails_full_clean&#34;, &#34;duration&#34;: &#34;3 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_models.py::TestDeskModel::test_permanent_desk_without_assignee_fails_full_clean&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;3 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_models.py::TestDeskModel::test_non_permanent_desk_with_assignee_fails_full_clean&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_models.py::TestDeskModel::test_non_permanent_desk_with_assignee_fails_full_clean&#34;, &#34;duration&#34;: &#34;376 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_models.py::TestDeskModel::test_non_permanent_desk_with_assignee_fails_full_clean&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;376 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_models.py::TestDeskModel::test_refresh_booking_state_with_no_bookings&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_models.py::TestDeskModel::test_refresh_booking_state_with_no_bookings&#34;, &#34;duration&#34;: &#34;4 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_models.py::TestDeskModel::test_refresh_booking_state_with_no_bookings&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;4 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_models.py::TestDeskModel::test_refresh_booking_state_marks_booked_for_active_booking&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_models.py::TestDeskModel::test_refresh_booking_state_marks_booked_for_active_booking&#34;, &#34;duration&#34;: &#34;373 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_models.py::TestDeskModel::test_refresh_booking_state_marks_booked_for_active_booking&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;373 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_models.py::TestDeskModel::test_refresh_booking_state_clears_booked_after_booking_ends&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_models.py::TestDeskModel::test_refresh_booking_state_clears_booked_after_booking_ends&#34;, &#34;duration&#34;: &#34;371 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_models.py::TestDeskModel::test_refresh_booking_state_clears_booked_after_booking_ends&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;371 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_models.py::TestDeskModel::test_desk_str_with_permanent_assignee&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_models.py::TestDeskModel::test_desk_str_with_permanent_assignee&#34;, &#34;duration&#34;: &#34;369 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_models.py::TestDeskModel::test_desk_str_with_permanent_assignee&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;369 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_models.py::TestLocationAccessControl::test_open_location_allows_any_authenticated_user&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_models.py::TestLocationAccessControl::test_open_location_allows_any_authenticated_user&#34;, &#34;duration&#34;: &#34;371 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_models.py::TestLocationAccessControl::test_open_location_allows_any_authenticated_user&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;371 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_models.py::TestLocationAccessControl::test_restricted_location_blocks_non_member&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_models.py::TestLocationAccessControl::test_restricted_location_blocks_non_member&#34;, &#34;duration&#34;: &#34;739 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_models.py::TestLocationAccessControl::test_restricted_location_blocks_non_member&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;739 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_models.py::TestLocationAccessControl::test_restricted_location_allows_group_member&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_models.py::TestLocationAccessControl::test_restricted_location_allows_group_member&#34;, &#34;duration&#34;: &#34;739 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_models.py::TestLocationAccessControl::test_restricted_location_allows_group_member&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;739 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_models.py::TestLocationAccessControl::test_location_manager_bypasses_restricted_gate&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_models.py::TestLocationAccessControl::test_location_manager_bypasses_restricted_gate&#34;, &#34;duration&#34;: &#34;743 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_models.py::TestLocationAccessControl::test_location_manager_bypasses_restricted_gate&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;743 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_models.py::TestLocationAccessControl::test_superuser_bypasses_restricted_gate&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_models.py::TestLocationAccessControl::test_superuser_bypasses_restricted_gate&#34;, &#34;duration&#34;: &#34;742 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_models.py::TestLocationAccessControl::test_superuser_bypasses_restricted_gate&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;742 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_models.py::TestLocationAccessControl::test_staff_user_bypasses_restricted_gate&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_models.py::TestLocationAccessControl::test_staff_user_bypasses_restricted_gate&#34;, &#34;duration&#34;: &#34;372 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_models.py::TestLocationAccessControl::test_staff_user_bypasses_restricted_gate&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;372 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_models.py::TestLocationAccessControl::test_user_in_multiple_groups_only_needs_one&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_models.py::TestLocationAccessControl::test_user_in_multiple_groups_only_needs_one&#34;, &#34;duration&#34;: &#34;373 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_models.py::TestLocationAccessControl::test_user_in_multiple_groups_only_needs_one&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;373 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_models.py::TestRoomAccessControl::test_room_with_no_allowed_groups_blocks_regular_user&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_models.py::TestRoomAccessControl::test_room_with_no_allowed_groups_blocks_regular_user&#34;, &#34;duration&#34;: &#34;373 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_models.py::TestRoomAccessControl::test_room_with_no_allowed_groups_blocks_regular_user&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;373 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_models.py::TestRoomAccessControl::test_group_member_can_book&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_models.py::TestRoomAccessControl::test_group_member_can_book&#34;, &#34;duration&#34;: &#34;373 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_models.py::TestRoomAccessControl::test_group_member_can_book&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;373 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_models.py::TestRoomAccessControl::test_non_member_cannot_book&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_models.py::TestRoomAccessControl::test_non_member_cannot_book&#34;, &#34;duration&#34;: &#34;736 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_models.py::TestRoomAccessControl::test_non_member_cannot_book&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;736 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_models.py::TestRoomAccessControl::test_room_manager_bypasses_gate&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_models.py::TestRoomAccessControl::test_room_manager_bypasses_gate&#34;, &#34;duration&#34;: &#34;369 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_models.py::TestRoomAccessControl::test_room_manager_bypasses_gate&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;369 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_models.py::TestRoomAccessControl::test_location_manager_bypasses_gate&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_models.py::TestRoomAccessControl::test_location_manager_bypasses_gate&#34;, &#34;duration&#34;: &#34;369 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_models.py::TestRoomAccessControl::test_location_manager_bypasses_gate&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;369 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_models.py::TestRoomAccessControl::test_superuser_bypasses_gate&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_models.py::TestRoomAccessControl::test_superuser_bypasses_gate&#34;, &#34;duration&#34;: &#34;372 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_models.py::TestRoomAccessControl::test_superuser_bypasses_gate&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;372 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_models.py::TestRoomAccessControl::test_location_gate_blocks_user_even_if_in_room_group&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_models.py::TestRoomAccessControl::test_location_gate_blocks_user_even_if_in_room_group&#34;, &#34;duration&#34;: &#34;372 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_models.py::TestRoomAccessControl::test_location_gate_blocks_user_even_if_in_room_group&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;372 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_models.py::TestRoomAccessControl::test_user_passing_both_gates_can_book&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_models.py::TestRoomAccessControl::test_user_passing_both_gates_can_book&#34;, &#34;duration&#34;: &#34;373 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_models.py::TestRoomAccessControl::test_user_passing_both_gates_can_book&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;373 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_tasks_and_locks.py::TestDeskLockService::test_acquire_succeeds_when_desk_is_free&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_tasks_and_locks.py::TestDeskLockService::test_acquire_succeeds_when_desk_is_free&#34;, &#34;duration&#34;: &#34;370 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_tasks_and_locks.py::TestDeskLockService::test_acquire_succeeds_when_desk_is_free&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;370 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_tasks_and_locks.py::TestDeskLockService::test_acquire_fails_when_held_by_different_user&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_tasks_and_locks.py::TestDeskLockService::test_acquire_fails_when_held_by_different_user&#34;, &#34;duration&#34;: &#34;740 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_tasks_and_locks.py::TestDeskLockService::test_acquire_fails_when_held_by_different_user&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;740 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_tasks_and_locks.py::TestDeskLockService::test_acquire_refreshes_ttl_for_same_owner&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_tasks_and_locks.py::TestDeskLockService::test_acquire_refreshes_ttl_for_same_owner&#34;, &#34;duration&#34;: &#34;373 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_tasks_and_locks.py::TestDeskLockService::test_acquire_refreshes_ttl_for_same_owner&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;373 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_tasks_and_locks.py::TestDeskLockService::test_release_succeeds_for_owner&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_tasks_and_locks.py::TestDeskLockService::test_release_succeeds_for_owner&#34;, &#34;duration&#34;: &#34;372 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_tasks_and_locks.py::TestDeskLockService::test_release_succeeds_for_owner&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;372 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_tasks_and_locks.py::TestDeskLockService::test_release_refused_for_non_owner&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_tasks_and_locks.py::TestDeskLockService::test_release_refused_for_non_owner&#34;, &#34;duration&#34;: &#34;749 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_tasks_and_locks.py::TestDeskLockService::test_release_refused_for_non_owner&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;749 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_tasks_and_locks.py::TestDeskLockService::test_release_returns_true_when_no_lock_exists&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_tasks_and_locks.py::TestDeskLockService::test_release_returns_true_when_no_lock_exists&#34;, &#34;duration&#34;: &#34;375 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_tasks_and_locks.py::TestDeskLockService::test_release_returns_true_when_no_lock_exists&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;375 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_tasks_and_locks.py::TestDeskLockService::test_read_lock_returns_none_when_no_key&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_tasks_and_locks.py::TestDeskLockService::test_read_lock_returns_none_when_no_key&#34;, &#34;duration&#34;: &#34;1 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_tasks_and_locks.py::TestDeskLockService::test_read_lock_returns_none_when_no_key&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;1 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_tasks_and_locks.py::TestDeskLockService::test_read_lock_returns_parsed_dict&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_tasks_and_locks.py::TestDeskLockService::test_read_lock_returns_parsed_dict&#34;, &#34;duration&#34;: &#34;374 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_tasks_and_locks.py::TestDeskLockService::test_read_lock_returns_parsed_dict&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;374 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_tasks_and_locks.py::TestDeskLockService::test_refresh_fails_for_non_owner&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_tasks_and_locks.py::TestDeskLockService::test_refresh_fails_for_non_owner&#34;, &#34;duration&#34;: &#34;741 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_tasks_and_locks.py::TestDeskLockService::test_refresh_fails_for_non_owner&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;741 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_tasks_and_locks.py::TestDeskLockService::test_refresh_deletes_key_and_returns_false_when_max_exceeded&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_tasks_and_locks.py::TestDeskLockService::test_refresh_deletes_key_and_returns_false_when_max_exceeded&#34;, &#34;duration&#34;: &#34;375 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_tasks_and_locks.py::TestDeskLockService::test_refresh_deletes_key_and_returns_false_when_max_exceeded&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;375 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_tasks_and_locks.py::TestDeskLockService::test_refresh_succeeds_for_owner_within_max&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_tasks_and_locks.py::TestDeskLockService::test_refresh_succeeds_for_owner_within_max&#34;, &#34;duration&#34;: &#34;371 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_tasks_and_locks.py::TestDeskLockService::test_refresh_succeeds_for_owner_within_max&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;371 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_tasks_and_locks.py::TestExpireAndActivateBookings::test_desk_cleared_after_booking_ends&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_tasks_and_locks.py::TestExpireAndActivateBookings::test_desk_cleared_after_booking_ends&#34;, &#34;duration&#34;: &#34;405 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_tasks_and_locks.py::TestExpireAndActivateBookings::test_desk_cleared_after_booking_ends&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;405 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_tasks_and_locks.py::TestExpireAndActivateBookings::test_desk_marked_booked_when_booking_starts&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_tasks_and_locks.py::TestExpireAndActivateBookings::test_desk_marked_booked_when_booking_starts&#34;, &#34;duration&#34;: &#34;379 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_tasks_and_locks.py::TestExpireAndActivateBookings::test_desk_marked_booked_when_booking_starts&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;379 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_tasks_and_locks.py::TestExpireAndActivateBookings::test_stale_db_lock_cleared_when_redis_key_gone&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_tasks_and_locks.py::TestExpireAndActivateBookings::test_stale_db_lock_cleared_when_redis_key_gone&#34;, &#34;duration&#34;: &#34;379 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_tasks_and_locks.py::TestExpireAndActivateBookings::test_stale_db_lock_cleared_when_redis_key_gone&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;379 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_tasks_and_locks.py::TestExpireAndActivateBookings::test_db_lock_preserved_when_redis_key_exists&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_tasks_and_locks.py::TestExpireAndActivateBookings::test_db_lock_preserved_when_redis_key_exists&#34;, &#34;duration&#34;: &#34;377 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_tasks_and_locks.py::TestExpireAndActivateBookings::test_db_lock_preserved_when_redis_key_exists&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;377 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_tasks_and_locks.py::TestStartupSyncDesks::test_active_booking_sets_desk_as_booked&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_tasks_and_locks.py::TestStartupSyncDesks::test_active_booking_sets_desk_as_booked&#34;, &#34;duration&#34;: &#34;395 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_tasks_and_locks.py::TestStartupSyncDesks::test_active_booking_sets_desk_as_booked&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;395 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_tasks_and_locks.py::TestStartupSyncDesks::test_no_active_booking_clears_stale_booked_flag&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_tasks_and_locks.py::TestStartupSyncDesks::test_no_active_booking_clears_stale_booked_flag&#34;, &#34;duration&#34;: &#34;373 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_tasks_and_locks.py::TestStartupSyncDesks::test_no_active_booking_clears_stale_booked_flag&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;373 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_tasks_and_locks.py::TestStartupSyncDesks::test_stale_lock_cleared_on_startup&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_tasks_and_locks.py::TestStartupSyncDesks::test_stale_lock_cleared_on_startup&#34;, &#34;duration&#34;: &#34;376 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_tasks_and_locks.py::TestStartupSyncDesks::test_stale_lock_cleared_on_startup&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;376 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.&#34;}], &#34;booking/tests/tests_tasks_and_locks.py::TestCleanupExpiredTokens::test_completes_with_no_tokens_present&#34;: [{&#34;extras&#34;: [], &#34;result&#34;: &#34;Passed&#34;, &#34;testId&#34;: &#34;booking/tests/tests_tasks_and_locks.py::TestCleanupExpiredTokens::test_completes_with_no_tokens_present&#34;, &#34;duration&#34;: &#34;3 ms&#34;, &#34;resultsTableRow&#34;: [&#34;&lt;td class=\&#34;col-result\&#34;&gt;Passed&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-testId\&#34;&gt;booking/tests/tests_tasks_and_locks.py::TestCleanupExpiredTokens::test_completes_with_no_tokens_present&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-duration\&#34;&gt;3 ms&lt;/td&gt;&#34;, &#34;&lt;td class=\&#34;col-links\&#34;&gt;&lt;/td&gt;&#34;], &#34;log&#34;: &#34;No log output captured.--------------------------- Captured stderr teardown ---------------------------\nDestroying test database for alias &amp;#x27;default&amp;#x27;...\r\n&#34;}]}, &#34;renderCollapsed&#34;: [&#34;passed&#34;], &#34;initialSort&#34;: &#34;result&#34;, &#34;title&#34;: &#34;FlexSpace Backend \u2014 Test Report&#34;}"></div>
+    <script>
+      (function(){function r(e,n,t){function o(i,f){if(!n[i]){if(!e[i]){var c="function"==typeof require&&require;if(!f&&c)return c(i,!0);if(u)return u(i,!0);var a=new Error("Cannot find module '"+i+"'");throw a.code="MODULE_NOT_FOUND",a}var p=n[i]={exports:{}};e[i][0].call(p.exports,function(r){var n=e[i][1][r];return o(n||r)},p,p.exports,r,e,n,t)}return n[i].exports}for(var u="function"==typeof require&&require,i=0;i<t.length;i++)o(t[i]);return o}return r})()({1:[function(require,module,exports){
+const { getCollapsedCategory, setCollapsedIds } = require('./storage.js')
+
+class DataManager {
+    setManager(data) {
+        const collapsedCategories = [...getCollapsedCategory(data.renderCollapsed)]
+        const collapsedIds = []
+        const tests = Object.values(data.tests).flat().map((test, index) => {
+            const collapsed = collapsedCategories.includes(test.result.toLowerCase())
+            const id = `test_${index}`
+            if (collapsed) {
+                collapsedIds.push(id)
+            }
+            return {
+                ...test,
+                id,
+                collapsed,
+            }
+        })
+        const dataBlob = { ...data, tests }
+        this.data = { ...dataBlob }
+        this.renderData = { ...dataBlob }
+        setCollapsedIds(collapsedIds)
+    }
+
+    get allData() {
+        return { ...this.data }
+    }
+
+    resetRender() {
+        this.renderData = { ...this.data }
+    }
+
+    setRender(data) {
+        this.renderData.tests = [...data]
+    }
+
+    toggleCollapsedItem(id) {
+        this.renderData.tests = this.renderData.tests.map((test) =>
+            test.id === id ? { ...test, collapsed: !test.collapsed } : test,
+        )
+    }
+
+    set allCollapsed(collapsed) {
+        this.renderData = { ...this.renderData, tests: [...this.renderData.tests.map((test) => (
+            { ...test, collapsed }
+        ))] }
+    }
+
+    get testSubset() {
+        return [...this.renderData.tests]
+    }
+
+    get environment() {
+        return this.renderData.environment
+    }
+
+    get initialSort() {
+        return this.data.initialSort
+    }
+}
+
+module.exports = {
+    manager: new DataManager(),
+}
+
+},{"./storage.js":8}],2:[function(require,module,exports){
+const mediaViewer = require('./mediaviewer.js')
+const templateEnvRow = document.getElementById('template_environment_row')
+const templateResult = document.getElementById('template_results-table__tbody')
+
+function htmlToElements(html) {
+    const temp = document.createElement('template')
+    temp.innerHTML = html
+    return temp.content.childNodes
+}
+
+const find = (selector, elem) => {
+    if (!elem) {
+        elem = document
+    }
+    return elem.querySelector(selector)
+}
+
+const findAll = (selector, elem) => {
+    if (!elem) {
+        elem = document
+    }
+    return [...elem.querySelectorAll(selector)]
+}
+
+const dom = {
+    getStaticRow: (key, value) => {
+        const envRow = templateEnvRow.content.cloneNode(true)
+        const isObj = typeof value === 'object' && value !== null
+        const values = isObj ? Object.keys(value).map((k) => `${k}: ${value[k]}`) : null
+
+        const valuesElement = htmlToElements(
+            values ? `<ul>${values.map((val) => `<li>${val}</li>`).join('')}<ul>` : `<div>${value}</div>`)[0]
+        const td = findAll('td', envRow)
+        td[0].textContent = key
+        td[1].appendChild(valuesElement)
+
+        return envRow
+    },
+    getResultTBody: ({ testId, id, log, extras, resultsTableRow, tableHtml, result, collapsed }) => {
+        const resultBody = templateResult.content.cloneNode(true)
+        resultBody.querySelector('tbody').classList.add(result.toLowerCase())
+        resultBody.querySelector('tbody').id = testId
+        resultBody.querySelector('.collapsible').dataset.id = id
+
+        resultsTableRow.forEach((html) => {
+            const t = document.createElement('template')
+            t.innerHTML = html
+            resultBody.querySelector('.collapsible').appendChild(t.content)
+        })
+
+        if (log) {
+            // Wrap lines starting with "E" with span.error to color those lines red
+            const wrappedLog = log.replace(/^E.*$/gm, (match) => `<span class="error">${match}</span>`)
+            resultBody.querySelector('.log').innerHTML = wrappedLog
+        } else {
+            resultBody.querySelector('.log').remove()
+        }
+
+        if (collapsed) {
+            resultBody.querySelector('.collapsible > .col-result')?.classList.add('collapsed')
+            resultBody.querySelector('.extras-row').classList.add('hidden')
+        } else {
+            resultBody.querySelector('.collapsible > .col-result')?.classList.remove('collapsed')
+        }
+
+        const media = []
+        extras?.forEach(({ name, format_type, content }) => {
+            if (['image', 'video'].includes(format_type)) {
+                media.push({ path: content, name, format_type })
+            }
+
+            if (format_type === 'html') {
+                resultBody.querySelector('.extraHTML').insertAdjacentHTML('beforeend', `<div>${content}</div>`)
+            }
+        })
+        mediaViewer.setup(resultBody, media)
+
+        // Add custom html from the pytest_html_results_table_html hook
+        tableHtml?.forEach((item) => {
+            resultBody.querySelector('td[class="extra"]').insertAdjacentHTML('beforeend', item)
+        })
+
+        return resultBody
+    },
+}
+
+module.exports = {
+    dom,
+    htmlToElements,
+    find,
+    findAll,
+}
+
+},{"./mediaviewer.js":6}],3:[function(require,module,exports){
+const { manager } = require('./datamanager.js')
+const { doSort } = require('./sort.js')
+const storageModule = require('./storage.js')
+
+const getFilteredSubSet = (filter) =>
+    manager.allData.tests.filter(({ result }) => filter.includes(result.toLowerCase()))
+
+const doInitFilter = () => {
+    const currentFilter = storageModule.getVisible()
+    const filteredSubset = getFilteredSubSet(currentFilter)
+    manager.setRender(filteredSubset)
+}
+
+const doFilter = (type, show) => {
+    if (show) {
+        storageModule.showCategory(type)
+    } else {
+        storageModule.hideCategory(type)
+    }
+
+    const currentFilter = storageModule.getVisible()
+    const filteredSubset = getFilteredSubSet(currentFilter)
+    manager.setRender(filteredSubset)
+
+    const sortColumn = storageModule.getSort()
+    doSort(sortColumn, true)
+}
+
+module.exports = {
+    doFilter,
+    doInitFilter,
+}
+
+},{"./datamanager.js":1,"./sort.js":7,"./storage.js":8}],4:[function(require,module,exports){
+const { redraw, bindEvents, renderStatic } = require('./main.js')
+const { doInitFilter } = require('./filter.js')
+const { doInitSort } = require('./sort.js')
+const { manager } = require('./datamanager.js')
+const data = JSON.parse(document.getElementById('data-container').dataset.jsonblob)
+
+function init() {
+    manager.setManager(data)
+    doInitFilter()
+    doInitSort()
+    renderStatic()
+    redraw()
+    bindEvents()
+}
+
+init()
+
+},{"./datamanager.js":1,"./filter.js":3,"./main.js":5,"./sort.js":7}],5:[function(require,module,exports){
+const { dom, find, findAll } = require('./dom.js')
+const { manager } = require('./datamanager.js')
+const { doSort } = require('./sort.js')
+const { doFilter } = require('./filter.js')
+const {
+    getVisible,
+    getCollapsedIds,
+    setCollapsedIds,
+    getSort,
+    getSortDirection,
+    possibleFilters,
+} = require('./storage.js')
+
+const removeChildren = (node) => {
+    while (node.firstChild) {
+        node.removeChild(node.firstChild)
+    }
+}
+
+const renderStatic = () => {
+    const renderEnvironmentTable = () => {
+        const environment = manager.environment
+        const rows = Object.keys(environment).map((key) => dom.getStaticRow(key, environment[key]))
+        const table = document.getElementById('environment')
+        removeChildren(table)
+        rows.forEach((row) => table.appendChild(row))
+    }
+    renderEnvironmentTable()
+}
+
+const addItemToggleListener = (elem) => {
+    elem.addEventListener('click', ({ target }) => {
+        const id = target.parentElement.dataset.id
+        manager.toggleCollapsedItem(id)
+
+        const collapsedIds = getCollapsedIds()
+        if (collapsedIds.includes(id)) {
+            const updated = collapsedIds.filter((item) => item !== id)
+            setCollapsedIds(updated)
+        } else {
+            collapsedIds.push(id)
+            setCollapsedIds(collapsedIds)
+        }
+        redraw()
+    })
+}
+
+const renderContent = (tests) => {
+    const sortAttr = getSort(manager.initialSort)
+    const sortAsc = JSON.parse(getSortDirection())
+    const rows = tests.map(dom.getResultTBody)
+    const table = document.getElementById('results-table')
+    const tableHeader = document.getElementById('results-table-head')
+
+    const newTable = document.createElement('table')
+    newTable.id = 'results-table'
+
+    // remove all sorting classes and set the relevant
+    findAll('.sortable', tableHeader).forEach((elem) => elem.classList.remove('asc', 'desc'))
+    tableHeader.querySelector(`.sortable[data-column-type="${sortAttr}"]`)?.classList.add(sortAsc ? 'desc' : 'asc')
+    newTable.appendChild(tableHeader)
+
+    if (!rows.length) {
+        const emptyTable = document.getElementById('template_results-table__body--empty').content.cloneNode(true)
+        newTable.appendChild(emptyTable)
+    } else {
+        rows.forEach((row) => {
+            if (!!row) {
+                findAll('.collapsible td:not(.col-links', row).forEach(addItemToggleListener)
+                find('.logexpander', row).addEventListener('click',
+                    (evt) => evt.target.parentNode.classList.toggle('expanded'),
+                )
+                newTable.appendChild(row)
+            }
+        })
+    }
+
+    table.replaceWith(newTable)
+}
+
+const renderDerived = () => {
+    const currentFilter = getVisible()
+    possibleFilters.forEach((result) => {
+        const input = document.querySelector(`input[data-test-result="${result}"]`)
+        input.checked = currentFilter.includes(result)
+    })
+}
+
+const bindEvents = () => {
+    const filterColumn = (evt) => {
+        const { target: element } = evt
+        const { testResult } = element.dataset
+
+        doFilter(testResult, element.checked)
+        const collapsedIds = getCollapsedIds()
+        const updated = manager.renderData.tests.map((test) => {
+            return {
+                ...test,
+                collapsed: collapsedIds.includes(test.id),
+            }
+        })
+        manager.setRender(updated)
+        redraw()
+    }
+
+    const header = document.getElementById('environment-header')
+    header.addEventListener('click', () => {
+        const table = document.getElementById('environment')
+        table.classList.toggle('hidden')
+        header.classList.toggle('collapsed')
+    })
+
+    findAll('input[name="filter_checkbox"]').forEach((elem) => {
+        elem.addEventListener('click', filterColumn)
+    })
+
+    findAll('.sortable').forEach((elem) => {
+        elem.addEventListener('click', (evt) => {
+            const { target: element } = evt
+            const { columnType } = element.dataset
+            doSort(columnType)
+            redraw()
+        })
+    })
+
+    document.getElementById('show_all_details').addEventListener('click', () => {
+        manager.allCollapsed = false
+        setCollapsedIds([])
+        redraw()
+    })
+    document.getElementById('hide_all_details').addEventListener('click', () => {
+        manager.allCollapsed = true
+        const allIds = manager.renderData.tests.map((test) => test.id)
+        setCollapsedIds(allIds)
+        redraw()
+    })
+}
+
+const redraw = () => {
+    const { testSubset } = manager
+
+    renderContent(testSubset)
+    renderDerived()
+}
+
+module.exports = {
+    redraw,
+    bindEvents,
+    renderStatic,
+}
+
+},{"./datamanager.js":1,"./dom.js":2,"./filter.js":3,"./sort.js":7,"./storage.js":8}],6:[function(require,module,exports){
+class MediaViewer {
+    constructor(assets) {
+        this.assets = assets
+        this.index = 0
+    }
+
+    nextActive() {
+        this.index = this.index === this.assets.length - 1 ? 0 : this.index + 1
+        return [this.activeFile, this.index]
+    }
+
+    prevActive() {
+        this.index = this.index === 0 ? this.assets.length - 1 : this.index -1
+        return [this.activeFile, this.index]
+    }
+
+    get currentIndex() {
+        return this.index
+    }
+
+    get activeFile() {
+        return this.assets[this.index]
+    }
+}
+
+
+const setup = (resultBody, assets) => {
+    if (!assets.length) {
+        resultBody.querySelector('.media').classList.add('hidden')
+        return
+    }
+
+    const mediaViewer = new MediaViewer(assets)
+    const container = resultBody.querySelector('.media-container')
+    const leftArrow = resultBody.querySelector('.media-container__nav--left')
+    const rightArrow = resultBody.querySelector('.media-container__nav--right')
+    const mediaName = resultBody.querySelector('.media__name')
+    const counter = resultBody.querySelector('.media__counter')
+    const imageEl = resultBody.querySelector('img')
+    const sourceEl = resultBody.querySelector('source')
+    const videoEl = resultBody.querySelector('video')
+
+    const setImg = (media, index) => {
+        if (media?.format_type === 'image') {
+            imageEl.src = media.path
+
+            imageEl.classList.remove('hidden')
+            videoEl.classList.add('hidden')
+        } else if (media?.format_type === 'video') {
+            sourceEl.src = media.path
+
+            videoEl.classList.remove('hidden')
+            imageEl.classList.add('hidden')
+        }
+
+        mediaName.innerText = media?.name
+        counter.innerText = `${index + 1} / ${assets.length}`
+    }
+    setImg(mediaViewer.activeFile, mediaViewer.currentIndex)
+
+    const moveLeft = () => {
+        const [media, index] = mediaViewer.prevActive()
+        setImg(media, index)
+    }
+    const doRight = () => {
+        const [media, index] = mediaViewer.nextActive()
+        setImg(media, index)
+    }
+    const openImg = () => {
+        window.open(mediaViewer.activeFile.path, '_blank')
+    }
+    if (assets.length === 1) {
+        container.classList.add('media-container--fullscreen')
+    } else {
+        leftArrow.addEventListener('click', moveLeft)
+        rightArrow.addEventListener('click', doRight)
+    }
+    imageEl.addEventListener('click', openImg)
+}
+
+module.exports = {
+    setup,
+}
+
+},{}],7:[function(require,module,exports){
+const { manager } = require('./datamanager.js')
+const storageModule = require('./storage.js')
+
+const genericSort = (list, key, ascending, customOrder) => {
+    let sorted
+    if (customOrder) {
+        sorted = list.sort((a, b) => {
+            const aValue = a.result.toLowerCase()
+            const bValue = b.result.toLowerCase()
+
+            const aIndex = customOrder.findIndex((item) => item.toLowerCase() === aValue)
+            const bIndex = customOrder.findIndex((item) => item.toLowerCase() === bValue)
+
+            // Compare the indices to determine the sort order
+            return aIndex - bIndex
+        })
+    } else {
+        sorted = list.sort((a, b) => a[key] === b[key] ? 0 : a[key] > b[key] ? 1 : -1)
+    }
+
+    if (ascending) {
+        sorted.reverse()
+    }
+    return sorted
+}
+
+const durationSort = (list, ascending) => {
+    const parseDuration = (duration) => {
+        if (duration.includes(':')) {
+            // If it's in the format "HH:mm:ss"
+            const [hours, minutes, seconds] = duration.split(':').map(Number)
+            return (hours * 3600 + minutes * 60 + seconds) * 1000
+        } else {
+            // If it's in the format "nnn ms"
+            return parseInt(duration)
+        }
+    }
+    const sorted = list.sort((a, b) => parseDuration(a['duration']) - parseDuration(b['duration']))
+    if (ascending) {
+        sorted.reverse()
+    }
+    return sorted
+}
+
+const doInitSort = () => {
+    const type = storageModule.getSort(manager.initialSort)
+    const ascending = storageModule.getSortDirection()
+    const list = manager.testSubset
+    const initialOrder = ['Error', 'Failed', 'Rerun', 'XFailed', 'XPassed', 'Skipped', 'Passed']
+
+    storageModule.setSort(type)
+    storageModule.setSortDirection(ascending)
+
+    if (type?.toLowerCase() === 'original') {
+        manager.setRender(list)
+    } else {
+        let sortedList
+        switch (type) {
+        case 'duration':
+            sortedList = durationSort(list, ascending)
+            break
+        case 'result':
+            sortedList = genericSort(list, type, ascending, initialOrder)
+            break
+        default:
+            sortedList = genericSort(list, type, ascending)
+            break
+        }
+        manager.setRender(sortedList)
+    }
+}
+
+const doSort = (type, skipDirection) => {
+    const newSortType = storageModule.getSort(manager.initialSort) !== type
+    const currentAsc = storageModule.getSortDirection()
+    let ascending
+    if (skipDirection) {
+        ascending = currentAsc
+    } else {
+        ascending = newSortType ? false : !currentAsc
+    }
+    storageModule.setSort(type)
+    storageModule.setSortDirection(ascending)
+
+    const list = manager.testSubset
+    const sortedList = type === 'duration' ? durationSort(list, ascending) : genericSort(list, type, ascending)
+    manager.setRender(sortedList)
+}
+
+module.exports = {
+    doInitSort,
+    doSort,
+}
+
+},{"./datamanager.js":1,"./storage.js":8}],8:[function(require,module,exports){
+const possibleFilters = [
+    'passed',
+    'skipped',
+    'failed',
+    'error',
+    'xfailed',
+    'xpassed',
+    'rerun',
+]
+
+const getVisible = () => {
+    const url = new URL(window.location.href)
+    const settings = new URLSearchParams(url.search).get('visible')
+    const lower = (item) => {
+        const lowerItem = item.toLowerCase()
+        if (possibleFilters.includes(lowerItem)) {
+            return lowerItem
+        }
+        return null
+    }
+    return settings === null ?
+        possibleFilters :
+        [...new Set(settings?.split(',').map(lower).filter((item) => item))]
+}
+
+const hideCategory = (categoryToHide) => {
+    const url = new URL(window.location.href)
+    const visibleParams = new URLSearchParams(url.search).get('visible')
+    const currentVisible = visibleParams ? visibleParams.split(',') : [...possibleFilters]
+    const settings = [...new Set(currentVisible)].filter((f) => f !== categoryToHide).join(',')
+
+    url.searchParams.set('visible', settings)
+    window.history.pushState({}, null, unescape(url.href))
+}
+
+const showCategory = (categoryToShow) => {
+    if (typeof window === 'undefined') {
+        return
+    }
+    const url = new URL(window.location.href)
+    const currentVisible = new URLSearchParams(url.search).get('visible')?.split(',').filter(Boolean) ||
+        [...possibleFilters]
+    const settings = [...new Set([categoryToShow, ...currentVisible])]
+    const noFilter = possibleFilters.length === settings.length || !settings.length
+
+    noFilter ? url.searchParams.delete('visible') : url.searchParams.set('visible', settings.join(','))
+    window.history.pushState({}, null, unescape(url.href))
+}
+
+const getSort = (initialSort) => {
+    const url = new URL(window.location.href)
+    let sort = new URLSearchParams(url.search).get('sort')
+    if (!sort) {
+        sort = initialSort || 'result'
+    }
+    return sort
+}
+
+const setSort = (type) => {
+    const url = new URL(window.location.href)
+    url.searchParams.set('sort', type)
+    window.history.pushState({}, null, unescape(url.href))
+}
+
+const getCollapsedCategory = (renderCollapsed) => {
+    let categories
+    if (typeof window !== 'undefined') {
+        const url = new URL(window.location.href)
+        const collapsedItems = new URLSearchParams(url.search).get('collapsed')
+        switch (true) {
+        case !renderCollapsed && collapsedItems === null:
+            categories = ['passed']
+            break
+        case collapsedItems?.length === 0 || /^["']{2}$/.test(collapsedItems):
+            categories = []
+            break
+        case /^all$/.test(collapsedItems) || collapsedItems === null && /^all$/.test(renderCollapsed):
+            categories = [...possibleFilters]
+            break
+        default:
+            categories = collapsedItems?.split(',').map((item) => item.toLowerCase()) || renderCollapsed
+            break
+        }
+    } else {
+        categories = []
+    }
+    return categories
+}
+
+const getSortDirection = () => JSON.parse(sessionStorage.getItem('sortAsc')) || false
+const setSortDirection = (ascending) => sessionStorage.setItem('sortAsc', ascending)
+
+const getCollapsedIds = () => JSON.parse(sessionStorage.getItem('collapsedIds')) || []
+const setCollapsedIds = (list) => sessionStorage.setItem('collapsedIds', JSON.stringify(list))
+
+module.exports = {
+    getVisible,
+    hideCategory,
+    showCategory,
+    getCollapsedIds,
+    setCollapsedIds,
+    getSort,
+    setSort,
+    getSortDirection,
+    setSortDirection,
+    getCollapsedCategory,
+    possibleFilters,
+}
+
+},{}]},{},[4]);
+    </script>
+  </footer>
+  </body>
+</html>

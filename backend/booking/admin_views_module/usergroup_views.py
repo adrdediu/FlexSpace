@@ -54,9 +54,9 @@ class UserGroupViewSet(viewsets.ModelViewSet):
             floors__rooms__in=managed_rooms
         ).distinct()
         
-        all_locations = managed_locations | room_locations
-        
-        return UserGroup.objects.filter(location__in=all_locations).distinct()
+        all_location_ids = list(managed_locations.values_list('id', flat=True)) + \
+                        list(room_locations.values_list('id', flat=True))
+        return UserGroup.objects.filter(location_id__in=all_location_ids).distinct()
     
     def perform_create(self, serializer):
         """Set created_by to current user"""
