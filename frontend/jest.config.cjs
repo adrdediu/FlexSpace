@@ -6,9 +6,6 @@ const config = {
   moduleNameMapper: {
     '\\.(css|less|scss|sass)$': '<rootDir>/src/__tests__/__mocks__/styleMock.ts',
     '\\.(svg|png|jpg|jpeg|gif)$': '<rootDir>/src/__tests__/__mocks__/fileMock.ts',
-    // Redirect both casing variants of webSocketService to the manual mock.
-    // jest.mock() hoisting only works for static imports; authService uses
-    // dynamic import() so moduleNameMapper is the correct interception point.
     '.*[wW]eb[sS]ocket[sS]ervice.*': '<rootDir>/src/__tests__/__mocks__/webSocketService.ts',
   },
   transform: {
@@ -26,6 +23,10 @@ const config = {
     '!src/**/*.d.ts',
   ],
   coverageReporters: ['text', 'lcov', 'html'],
+  reporters: [
+    'default',
+    '<rootDir>/src/__tests__/reporter/htmlReporter.cjs',
+  ],
 };
 
 module.exports = config;

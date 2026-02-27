@@ -1,0 +1,1038 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>FlexSpace · Test Report</title>
+  <style>
+    /* ── Reset & Base ──────────────────────────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --pass:   #22c55e;
+      --fail:   #ef4444;
+      --skip:   #f59e0b;
+      --bg:     #0f1117;
+      --surface:#161b27;
+      --card:   #1c2333;
+      --border: #2a3349;
+      --text:   #e2e8f0;
+      --muted:  #64748b;
+      --accent: #6366f1;
+      --font-mono: 'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace;
+      --font-ui: 'Inter', 'Segoe UI', system-ui, sans-serif;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font-ui);
+      font-size: 14px;
+      line-height: 1.6;
+      min-height: 100vh;
+    }
+
+    /* ── Header ────────────────────────────────────────────────────────── */
+    .header {
+      background: linear-gradient(135deg, #1a1f35 0%, #0f1117 60%);
+      border-bottom: 1px solid var(--border);
+      padding: 32px 48px 28px;
+      display: flex;
+      align-items: flex-start;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 24px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand-logo {
+      width: 36px; height: 36px;
+      background: var(--accent);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px; font-weight: 800; color: #fff;
+      letter-spacing: -1px;
+      flex-shrink: 0;
+    }
+
+    .brand-text h1 {
+      font-size: 20px;
+      font-weight: 700;
+      color: #fff;
+      letter-spacing: -0.5px;
+    }
+
+    .brand-text p {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+
+    .header-meta {
+      text-align: right;
+      font-size: 12px;
+      color: var(--muted);
+      line-height: 1.8;
+    }
+
+    .header-meta strong { color: var(--text); }
+
+    /* ── Status Banner ─────────────────────────────────────────────────── */
+    .status-banner {
+      padding: 0 48px;
+      margin-top: -1px;
+    }
+
+    .status-bar {
+      height: 4px;
+      border-radius: 0 0 4px 4px;
+      background: var(--pass);
+    }
+
+    .status-bar.failed { background: var(--fail); }
+
+    /* ── Summary Cards ─────────────────────────────────────────────────── */
+    .summary {
+      padding: 32px 48px;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 16px;
+    }
+
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 20px 24px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    .card::before {
+      content: '';
+      position: absolute;
+      top: 0; left: 0; right: 0;
+      height: 3px;
+    }
+
+    .card.pass-card::before  { background: var(--pass); }
+    .card.fail-card::before  { background: var(--fail); }
+    .card.skip-card::before  { background: var(--skip); }
+    .card.total-card::before { background: var(--accent); }
+    .card.time-card::before  { background: #8b5cf6; }
+
+    .card-value {
+      font-size: 36px;
+      font-weight: 800;
+      letter-spacing: -2px;
+      line-height: 1;
+      margin-bottom: 6px;
+    }
+
+    .pass-card  .card-value { color: var(--pass); }
+    .fail-card  .card-value { color: var(--fail); }
+    .skip-card  .card-value { color: var(--skip); }
+    .total-card .card-value { color: var(--accent); }
+    .time-card  .card-value { color: #a78bfa; font-size: 28px; }
+
+    .card-label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      color: var(--muted);
+    }
+
+    /* ── Progress bar ──────────────────────────────────────────────────── */
+    .progress-wrap {
+      padding: 0 48px 32px;
+    }
+
+    .progress-label {
+      display: flex;
+      justify-content: space-between;
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    .progress-label strong { color: var(--text); }
+
+    .progress-track {
+      height: 8px;
+      background: var(--border);
+      border-radius: 99px;
+      overflow: hidden;
+    }
+
+    .progress-fill {
+      height: 100%;
+      border-radius: 99px;
+      background: linear-gradient(90deg, var(--pass), #86efac);
+      transition: width 0.6s ease;
+    }
+
+    .progress-fill.has-failures {
+      background: linear-gradient(90deg, var(--pass), #86efac 100%, var(--fail) 100%);
+    }
+
+    /* ── Toolbar ───────────────────────────────────────────────────────── */
+    .toolbar {
+      padding: 0 48px 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+
+    .filter-btn {
+      padding: 6px 16px;
+      border-radius: 99px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+      font-family: var(--font-ui);
+    }
+
+    .filter-btn:hover,
+    .filter-btn.active {
+      background: var(--card);
+      color: var(--text);
+      border-color: var(--accent);
+    }
+
+    .filter-btn.pass-btn.active  { border-color: var(--pass); color: var(--pass); }
+    .filter-btn.fail-btn.active  { border-color: var(--fail); color: var(--fail); }
+    .filter-btn.skip-btn.active  { border-color: var(--skip); color: var(--skip); }
+
+    .expand-all-btn {
+      margin-left: auto;
+      padding: 6px 16px;
+      border-radius: 99px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--muted);
+      font-size: 12px;
+      cursor: pointer;
+      font-family: var(--font-ui);
+      transition: all 0.15s;
+    }
+
+    .expand-all-btn:hover {
+      background: var(--card);
+      color: var(--text);
+    }
+
+    /* ── Table ─────────────────────────────────────────────────────────── */
+    .results-wrap {
+      padding: 0 48px 48px;
+    }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+    }
+
+    .suite-header {
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .suite-header td {
+      padding: 0;
+    }
+
+    .suite-header-inner {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 18px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      margin-bottom: 2px;
+      transition: background 0.15s;
+    }
+
+    .suite-header:hover .suite-header-inner {
+      background: var(--card);
+    }
+
+    .suite-header.failed .suite-header-inner {
+      border-left: 3px solid var(--fail);
+    }
+
+    .suite-header.passed .suite-header-inner {
+      border-left: 3px solid var(--pass);
+    }
+
+    .suite-chevron {
+      color: var(--muted);
+      font-size: 10px;
+      transition: transform 0.2s;
+      flex-shrink: 0;
+    }
+
+    .suite-chevron.collapsed { transform: rotate(-90deg); }
+
+    .suite-path {
+      font-family: var(--font-mono);
+      font-size: 12px;
+      color: var(--text);
+      flex: 1;
+    }
+
+    .suite-badges {
+      display: flex;
+      gap: 6px;
+      flex-shrink: 0;
+    }
+
+    .badge {
+      padding: 2px 10px;
+      border-radius: 99px;
+      font-size: 11px;
+      font-weight: 600;
+    }
+
+    .pass-badge  { background: rgba(34,197,94,0.15);  color: var(--pass); }
+    .fail-badge  { background: rgba(239,68,68,0.15);  color: var(--fail); }
+    .skip-badge  { background: rgba(245,158,11,0.15); color: var(--skip); }
+    .time-badge  { background: rgba(99,102,241,0.12); color: #818cf8; }
+
+    /* Test rows */
+    .test-row td {
+      padding: 8px 12px;
+      border-bottom: 1px solid rgba(42,51,73,0.5);
+      vertical-align: top;
+    }
+
+    .test-row:last-child td { border-bottom: none; }
+
+    .test-row.passed { background: transparent; }
+    .test-row.failed { background: rgba(239,68,68,0.04); }
+    .test-row.pending { background: rgba(245,158,11,0.03); opacity: 0.7; }
+
+    .test-status-cell {
+      width: 36px;
+      text-align: center;
+      padding-top: 10px;
+    }
+
+    .icon { font-size: 13px; font-weight: 700; }
+    .pass-icon { color: var(--pass); }
+    .fail-icon { color: var(--fail); }
+    .skip-icon { color: var(--skip); }
+
+    .test-name-cell { padding-left: 4px; }
+
+    .ancestor {
+      display: block;
+      font-size: 11px;
+      color: var(--muted);
+      margin-bottom: 2px;
+    }
+
+    .test-title {
+      font-size: 13px;
+      color: var(--text);
+    }
+
+    .test-duration {
+      width: 80px;
+      text-align: right;
+      font-size: 11px;
+      color: var(--muted);
+      font-family: var(--font-mono);
+      padding-top: 10px;
+      white-space: nowrap;
+    }
+
+    /* Failure messages */
+    .failures {
+      margin-top: 10px;
+    }
+
+    .failure-msg {
+      background: rgba(239,68,68,0.06);
+      border: 1px solid rgba(239,68,68,0.2);
+      border-left: 3px solid var(--fail);
+      border-radius: 6px;
+      padding: 12px 16px;
+      font-family: var(--font-mono);
+      font-size: 11.5px;
+      color: #fca5a5;
+      white-space: pre-wrap;
+      overflow-x: auto;
+      margin-top: 6px;
+      line-height: 1.7;
+    }
+
+    /* Hidden rows when filtering */
+    .test-row.hidden { display: none; }
+    .suite-group.all-hidden .suite-header { display: none; }
+
+    /* ── Footer ────────────────────────────────────────────────────────── */
+    .footer {
+      border-top: 1px solid var(--border);
+      padding: 20px 48px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 12px;
+      color: var(--muted);
+    }
+
+    /* ── Responsive ────────────────────────────────────────────────────── */
+    @media (max-width: 700px) {
+      .header, .summary, .toolbar, .results-wrap, .progress-wrap, .footer {
+        padding-left: 16px;
+        padding-right: 16px;
+      }
+      .summary { grid-template-columns: repeat(2, 1fr); }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Header -->
+  <header class="header">
+    <div class="brand">
+      <div class="brand-logo">FS</div>
+      <div class="brand-text">
+        <h1>FlexSpace Frontend</h1>
+        <p>Test Report</p>
+      </div>
+    </div>
+    <div class="header-meta">
+      <div>Run at <strong>2/27/2026, 11:26:31 AM</strong></div>
+      <div>Duration <strong>2.93s</strong></div>
+      <div>2 suites</div>
+    </div>
+  </header>
+
+  <!-- Status bar -->
+  <div class="status-banner">
+    <div class="status-bar passed"></div>
+  </div>
+
+  <!-- Summary cards -->
+  <section class="summary">
+    <div class="card pass-card">
+      <div class="card-value">50</div>
+      <div class="card-label">Passed</div>
+    </div>
+    <div class="card fail-card">
+      <div class="card-value">0</div>
+      <div class="card-label">Failed</div>
+    </div>
+    <div class="card skip-card">
+      <div class="card-value">0</div>
+      <div class="card-label">Skipped</div>
+    </div>
+    <div class="card total-card">
+      <div class="card-value">50</div>
+      <div class="card-label">Total Tests</div>
+    </div>
+    <div class="card time-card">
+      <div class="card-value">2.93s</div>
+      <div class="card-label">Duration</div>
+    </div>
+  </section>
+
+  <!-- Progress bar -->
+  <div class="progress-wrap">
+    <div class="progress-label">
+      <span>Pass rate</span>
+      <strong>100%</strong>
+    </div>
+    <div class="progress-track">
+      <div class="progress-fill "
+           style="width: 100%"></div>
+    </div>
+  </div>
+
+  <!-- Toolbar -->
+  <div class="toolbar">
+    <button class="filter-btn active" onclick="filter('all', this)">All</button>
+    <button class="filter-btn fail-btn" onclick="filter('failed', this)">Failed</button>
+    <button class="filter-btn pass-btn" onclick="filter('passed', this)">Passed</button>
+    <button class="filter-btn skip-btn" onclick="filter('pending', this)">Skipped</button>
+    <button class="expand-all-btn" onclick="toggleAll()">Collapse all</button>
+  </div>
+
+  <!-- Results table -->
+  <div class="results-wrap">
+    <table>
+      
+      <tbody class="suite-group" id="suite-0">
+        <tr class="suite-header passed" onclick="toggleSuite(0)">
+          <td colspan="3">
+            <div class="suite-header-inner">
+              <span class="suite-chevron" id="chev-0">▼</span>
+              <span class="suite-path">src/__tests__/services/authService.test.ts</span>
+              <span class="suite-badges">
+                <span class="badge pass-badge">29 passed</span>
+                
+                
+                <span class="badge time-badge">1.63s</span>
+              </span>
+            </div>
+          </td>
+        </tr>
+        
+        <tr class="test-row passed" data-suite="0">
+          <td class="test-status-cell"><span class="icon pass-icon">✓</span></td>
+          <td class="test-name-cell">
+            <span class="ancestor">authService.login()</span>
+            <span class="test-title">resolves with user data and sets isAuthenticated on success</span>
+            
+          </td>
+          <td class="test-duration">4ms</td>
+        </tr>
+        <tr class="test-row passed" data-suite="0">
+          <td class="test-status-cell"><span class="icon pass-icon">✓</span></td>
+          <td class="test-name-cell">
+            <span class="ancestor">authService.login()</span>
+            <span class="test-title">sends credentials and JSON body to the correct endpoint</span>
+            
+          </td>
+          <td class="test-duration">1ms</td>
+        </tr>
+        <tr class="test-row passed" data-suite="0">
+          <td class="test-status-cell"><span class="icon pass-icon">✓</span></td>
+          <td class="test-name-cell">
+            <span class="ancestor">authService.login()</span>
+            <span class="test-title">throws with server detail message on 400 response</span>
+            
+          </td>
+          <td class="test-duration">7ms</td>
+        </tr>
+        <tr class="test-row passed" data-suite="0">
+          <td class="test-status-cell"><span class="icon pass-icon">✓</span></td>
+          <td class="test-name-cell">
+            <span class="ancestor">authService.login()</span>
+            <span class="test-title">throws generic &quot;Login failed&quot; when error response has no detail</span>
+            
+          </td>
+          <td class="test-duration">1ms</td>
+        </tr>
+        <tr class="test-row passed" data-suite="0">
+          <td class="test-status-cell"><span class="icon pass-icon">✓</span></td>
+          <td class="test-name-cell">
+            <span class="ancestor">authService.login()</span>
+            <span class="test-title">throws and clears auth flag on network failure</span>
+            
+          </td>
+          <td class="test-duration">1ms</td>
+        </tr>
+        <tr class="test-row passed" data-suite="0">
+          <td class="test-status-cell"><span class="icon pass-icon">✓</span></td>
+          <td class="test-name-cell">
+            <span class="ancestor">authService.login()</span>
+            <span class="test-title">stores username and email accessors after successful login</span>
+            
+          </td>
+          <td class="test-duration">1ms</td>
+        </tr>
+        <tr class="test-row passed" data-suite="0">
+          <td class="test-status-cell"><span class="icon pass-icon">✓</span></td>
+          <td class="test-name-cell">
+            <span class="ancestor">authService.logout()</span>
+            <span class="test-title">returns true and clears auth state on 205 response</span>
+            
+          </td>
+          <td class="test-duration">1ms</td>
+        </tr>
+        <tr class="test-row passed" data-suite="0">
+          <td class="test-status-cell"><span class="icon pass-icon">✓</span></td>
+          <td class="test-name-cell">
+            <span class="ancestor">authService.logout()</span>
+            <span class="test-title">returns true on any 2xx response (e.g. 200)</span>
+            
+          </td>
+          <td class="test-duration"><1ms</td>
+        </tr>
+        <tr class="test-row passed" data-suite="0">
+          <td class="test-status-cell"><span class="icon pass-icon">✓</span></td>
+          <td class="test-name-cell">
+            <span class="ancestor">authService.logout()</span>
+            <span class="test-title">still clears local state even if server returns non-2xx</span>
+            
+          </td>
+          <td class="test-duration">1ms</td>
+        </tr>
+        <tr class="test-row passed" data-suite="0">
+          <td class="test-status-cell"><span class="icon pass-icon">✓</span></td>
+          <td class="test-name-cell">
+            <span class="ancestor">authService.logout()</span>
+            <span class="test-title">throws on network error during logout</span>
+            
+          </td>
+          <td class="test-duration"><1ms</td>
+        </tr>
+        <tr class="test-row passed" data-suite="0">
+          <td class="test-status-cell"><span class="icon pass-icon">✓</span></td>
+          <td class="test-name-cell">
+            <span class="ancestor">authService.logout()</span>
+            <span class="test-title">calls the correct endpoint with POST + credentials</span>
+            
+          </td>
+          <td class="test-duration">1ms</td>
+        </tr>
+        <tr class="test-row passed" data-suite="0">
+          <td class="test-status-cell"><span class="icon pass-icon">✓</span></td>
+          <td class="test-name-cell">
+            <span class="ancestor">authService.refreshToken()</span>
+            <span class="test-title">returns true and sets isAuthenticated on 200</span>
+            
+          </td>
+          <td class="test-duration"><1ms</td>
+        </tr>
+        <tr class="test-row passed" data-suite="0">
+          <td class="test-status-cell"><span class="icon pass-icon">✓</span></td>
+          <td class="test-name-cell">
+            <span class="ancestor">authService.refreshToken()</span>
+            <span class="test-title">returns false and clears isAuthenticated on 401</span>
+            
+          </td>
+          <td class="test-duration"><1ms</td>
+        </tr>
+        <tr class="test-row passed" data-suite="0">
+          <td class="test-status-cell"><span class="icon pass-icon">✓</span></td>
+          <td class="test-name-cell">
+            <span class="ancestor">authService.refreshToken()</span>
+            <span class="test-title">returns false on network error (does not throw)</span>
+            
+          </td>
+          <td class="test-duration">1ms</td>
+        </tr>
+        <tr class="test-row passed" data-suite="0">
+          <td class="test-status-cell"><span class="icon pass-icon">✓</span></td>
+          <td class="test-name-cell">
+            <span class="ancestor">authService.refreshToken()</span>
+            <span class="test-title">calls the correct endpoint</span>
+            
+          </td>
+          <td class="test-duration"><1ms</td>
+        </tr>
+        <tr class="test-row passed" data-suite="0">
+          <td class="test-status-cell"><span class="icon pass-icon">✓</span></td>
+          <td class="test-name-cell">
+            <span class="ancestor">authService.getUserProfile()</span>
+            <span class="test-title">returns user data and sets isAuthenticated on 200</span>
+            
+          </td>
+          <td class="test-duration"><1ms</td>
+        </tr>
+        <tr class="test-row passed" data-suite="0">
+          <td class="test-status-cell"><span class="icon pass-icon">✓</span></td>
+          <td class="test-name-cell">
+            <span class="ancestor">authService.getUserProfile()</span>
+            <span class="test-title">populates all optional boolean fields (defaults false when missing)</span>
+            
+          </td>
+          <td class="test-duration">1ms</td>
+        </tr>
+        <tr class="test-row passed" data-suite="0">
+          <td class="test-status-cell"><span class="icon pass-icon">✓</span></td>
+          <td class="test-name-cell">
+            <span class="ancestor">authService.getUserProfile()</span>
+            <span class="test-title">retries with refreshToken on 401 and succeeds</span>
+            
+          </td>
+          <td class="test-duration"><1ms</td>
+        </tr>
+        <tr class="test-row passed" data-suite="0">
+          <td class="test-status-cell"><span class="icon pass-icon">✓</span></td>
+          <td class="test-name-cell">
+            <span class="ancestor">authService.getUserProfile()</span>
+            <span class="test-title">returns null when 401 and refreshToken fails</span>
+            
+          </td>
+          <td class="test-duration"><1ms</td>
+        </tr>
+        <tr class="test-row passed" data-suite="0">
+          <td class="test-status-cell"><span class="icon pass-icon">✓</span></td>
+          <td class="test-name-cell">
+            <span class="ancestor">authService.getUserProfile()</span>
+            <span class="test-title">returns null when server returns non-401 error after successful refresh</span>
+            
+          </td>
+          <td class="test-duration">1ms</td>
+        </tr>
+        <tr class="test-row passed" data-suite="0">
+          <td class="test-status-cell"><span class="icon pass-icon">✓</span></td>
+          <td class="test-name-cell">
+            <span class="ancestor">authService.getUserProfile()</span>
+            <span class="test-title">returns null and clears auth on network error</span>
+            
+          </td>
+          <td class="test-duration"><1ms</td>
+        </tr>
+        <tr class="test-row passed" data-suite="0">
+          <td class="test-status-cell"><span class="icon pass-icon">✓</span></td>
+          <td class="test-name-cell">
+            <span class="ancestor">authService.getUserProfile()</span>
+            <span class="test-title">stores all fields on the service instance after success</span>
+            
+          </td>
+          <td class="test-duration"><1ms</td>
+        </tr>
+        <tr class="test-row passed" data-suite="0">
+          <td class="test-status-cell"><span class="icon pass-icon">✓</span></td>
+          <td class="test-name-cell">
+            <span class="ancestor">authService.checkAuth()</span>
+            <span class="test-title">returns true when getUserProfile returns a valid user</span>
+            
+          </td>
+          <td class="test-duration"><1ms</td>
+        </tr>
+        <tr class="test-row passed" data-suite="0">
+          <td class="test-status-cell"><span class="icon pass-icon">✓</span></td>
+          <td class="test-name-cell">
+            <span class="ancestor">authService.checkAuth()</span>
+            <span class="test-title">returns false when getUserProfile returns null</span>
+            
+          </td>
+          <td class="test-duration">1ms</td>
+        </tr>
+        <tr class="test-row passed" data-suite="0">
+          <td class="test-status-cell"><span class="icon pass-icon">✓</span></td>
+          <td class="test-name-cell">
+            <span class="ancestor">authService.getUserInfo()</span>
+            <span class="test-title">returns null when no user is loaded</span>
+            
+          </td>
+          <td class="test-duration"><1ms</td>
+        </tr>
+        <tr class="test-row passed" data-suite="0">
+          <td class="test-status-cell"><span class="icon pass-icon">✓</span></td>
+          <td class="test-name-cell">
+            <span class="ancestor">authService.getUserInfo()</span>
+            <span class="test-title">returns full user object after a successful getUserProfile</span>
+            
+          </td>
+          <td class="test-duration">1ms</td>
+        </tr>
+        <tr class="test-row passed" data-suite="0">
+          <td class="test-status-cell"><span class="icon pass-icon">✓</span></td>
+          <td class="test-name-cell">
+            <span class="ancestor">authService.isAuthenticated()</span>
+            <span class="test-title">reflects false before any successful auth call</span>
+            
+          </td>
+          <td class="test-duration"><1ms</td>
+        </tr>
+        <tr class="test-row passed" data-suite="0">
+          <td class="test-status-cell"><span class="icon pass-icon">✓</span></td>
+          <td class="test-name-cell">
+            <span class="ancestor">authService.isAuthenticated()</span>
+            <span class="test-title">reflects true after a successful login</span>
+            
+          </td>
+          <td class="test-duration"><1ms</td>
+        </tr>
+        <tr class="test-row passed" data-suite="0">
+          <td class="test-status-cell"><span class="icon pass-icon">✓</span></td>
+          <td class="test-name-cell">
+            <span class="ancestor">authService.isAuthenticated()</span>
+            <span class="test-title">reverts to false after logout</span>
+            
+          </td>
+          <td class="test-duration"><1ms</td>
+        </tr>
+      </tbody>
+      <tbody class="suite-group" id="suite-1">
+        <tr class="suite-header passed" onclick="toggleSuite(1)">
+          <td colspan="3">
+            <div class="suite-header-inner">
+              <span class="suite-chevron" id="chev-1">▼</span>
+              <span class="suite-path">src/__tests__/contexts/AuthContext.test.tsx</span>
+              <span class="suite-badges">
+                <span class="badge pass-badge">21 passed</span>
+                
+                
+                <span class="badge time-badge">1.89s</span>
+              </span>
+            </div>
+          </td>
+        </tr>
+        
+        <tr class="test-row passed" data-suite="1">
+          <td class="test-status-cell"><span class="icon pass-icon">✓</span></td>
+          <td class="test-name-cell">
+            <span class="ancestor">AuthProvider — initialisation</span>
+            <span class="test-title">starts in loading state then resolves with user when session exists</span>
+            
+          </td>
+          <td class="test-duration">28ms</td>
+        </tr>
+        <tr class="test-row passed" data-suite="1">
+          <td class="test-status-cell"><span class="icon pass-icon">✓</span></td>
+          <td class="test-name-cell">
+            <span class="ancestor">AuthProvider — initialisation</span>
+            <span class="test-title">resolves with null user when no active session</span>
+            
+          </td>
+          <td class="test-duration">4ms</td>
+        </tr>
+        <tr class="test-row passed" data-suite="1">
+          <td class="test-status-cell"><span class="icon pass-icon">✓</span></td>
+          <td class="test-name-cell">
+            <span class="ancestor">AuthProvider — initialisation</span>
+            <span class="test-title">handles getUserProfile throwing without crashing — user stays null</span>
+            
+          </td>
+          <td class="test-duration">3ms</td>
+        </tr>
+        <tr class="test-row passed" data-suite="1">
+          <td class="test-status-cell"><span class="icon pass-icon">✓</span></td>
+          <td class="test-name-cell">
+            <span class="ancestor">AuthProvider — initialisation</span>
+            <span class="test-title">init useEffect only runs once even though dep array contains [user]</span>
+            
+          </td>
+          <td class="test-duration">3ms</td>
+        </tr>
+        <tr class="test-row passed" data-suite="1">
+          <td class="test-status-cell"><span class="icon pass-icon">✓</span></td>
+          <td class="test-name-cell">
+            <span class="ancestor">AuthProvider — login()</span>
+            <span class="test-title">sets user and isAuthenticated=true on successful login</span>
+            
+          </td>
+          <td class="test-duration">47ms</td>
+        </tr>
+        <tr class="test-row passed" data-suite="1">
+          <td class="test-status-cell"><span class="icon pass-icon">✓</span></td>
+          <td class="test-name-cell">
+            <span class="ancestor">AuthProvider — login()</span>
+            <span class="test-title">sets error message and keeps user null on failed login</span>
+            
+          </td>
+          <td class="test-duration">8ms</td>
+        </tr>
+        <tr class="test-row passed" data-suite="1">
+          <td class="test-status-cell"><span class="icon pass-icon">✓</span></td>
+          <td class="test-name-cell">
+            <span class="ancestor">AuthProvider — login()</span>
+            <span class="test-title">clears a previous error before the next login attempt</span>
+            
+          </td>
+          <td class="test-duration">10ms</td>
+        </tr>
+        <tr class="test-row passed" data-suite="1">
+          <td class="test-status-cell"><span class="icon pass-icon">✓</span></td>
+          <td class="test-name-cell">
+            <span class="ancestor">AuthProvider — logout()</span>
+            <span class="test-title">clears user and isAuthenticated on successful logout</span>
+            
+          </td>
+          <td class="test-duration">7ms</td>
+        </tr>
+        <tr class="test-row passed" data-suite="1">
+          <td class="test-status-cell"><span class="icon pass-icon">✓</span></td>
+          <td class="test-name-cell">
+            <span class="ancestor">AuthProvider — logout()</span>
+            <span class="test-title">sets error=&quot;Logout failed&quot; when authService.logout throws</span>
+            
+          </td>
+          <td class="test-duration">6ms</td>
+        </tr>
+        <tr class="test-row passed" data-suite="1">
+          <td class="test-status-cell"><span class="icon pass-icon">✓</span></td>
+          <td class="test-name-cell">
+            <span class="ancestor">AuthProvider — clearError()</span>
+            <span class="test-title">resets error to null</span>
+            
+          </td>
+          <td class="test-duration">8ms</td>
+        </tr>
+        <tr class="test-row passed" data-suite="1">
+          <td class="test-status-cell"><span class="icon pass-icon">✓</span></td>
+          <td class="test-name-cell">
+            <span class="ancestor">AuthProvider — authenticatedFetch()</span>
+            <span class="test-title">calls fetch once with correct options when response is 200</span>
+            
+          </td>
+          <td class="test-duration">5ms</td>
+        </tr>
+        <tr class="test-row passed" data-suite="1">
+          <td class="test-status-cell"><span class="icon pass-icon">✓</span></td>
+          <td class="test-name-cell">
+            <span class="ancestor">AuthProvider — authenticatedFetch()</span>
+            <span class="test-title">retries once on 401 when refreshToken succeeds</span>
+            
+          </td>
+          <td class="test-duration">5ms</td>
+        </tr>
+        <tr class="test-row passed" data-suite="1">
+          <td class="test-status-cell"><span class="icon pass-icon">✓</span></td>
+          <td class="test-name-cell">
+            <span class="ancestor">AuthProvider — authenticatedFetch()</span>
+            <span class="test-title">clears user and sets session-expired error when 401 and refresh fails</span>
+            
+          </td>
+          <td class="test-duration">4ms</td>
+        </tr>
+        <tr class="test-row passed" data-suite="1">
+          <td class="test-status-cell"><span class="icon pass-icon">✓</span></td>
+          <td class="test-name-cell">
+            <span class="ancestor">AuthProvider — authenticatedFetch()</span>
+            <span class="test-title">always sends credentials:include and Content-Type header</span>
+            
+          </td>
+          <td class="test-duration">5ms</td>
+        </tr>
+        <tr class="test-row passed" data-suite="1">
+          <td class="test-status-cell"><span class="icon pass-icon">✓</span></td>
+          <td class="test-name-cell">
+            <span class="ancestor">AuthProvider — token refresh interval</span>
+            <span class="test-title">calls refreshToken after 4 minutes when user is logged in</span>
+            
+          </td>
+          <td class="test-duration">2ms</td>
+        </tr>
+        <tr class="test-row passed" data-suite="1">
+          <td class="test-status-cell"><span class="icon pass-icon">✓</span></td>
+          <td class="test-name-cell">
+            <span class="ancestor">AuthProvider — token refresh interval</span>
+            <span class="test-title">clears user and sets session-expired error when interval refresh fails</span>
+            
+          </td>
+          <td class="test-duration">3ms</td>
+        </tr>
+        <tr class="test-row passed" data-suite="1">
+          <td class="test-status-cell"><span class="icon pass-icon">✓</span></td>
+          <td class="test-name-cell">
+            <span class="ancestor">AuthProvider — token refresh interval</span>
+            <span class="test-title">does not start refresh interval when user is null</span>
+            
+          </td>
+          <td class="test-duration">2ms</td>
+        </tr>
+        <tr class="test-row passed" data-suite="1">
+          <td class="test-status-cell"><span class="icon pass-icon">✓</span></td>
+          <td class="test-name-cell">
+            <span class="ancestor">AuthProvider — visibility change refresh</span>
+            <span class="test-title">calls refreshToken when tab becomes visible and user is logged in</span>
+            
+          </td>
+          <td class="test-duration">2ms</td>
+        </tr>
+        <tr class="test-row passed" data-suite="1">
+          <td class="test-status-cell"><span class="icon pass-icon">✓</span></td>
+          <td class="test-name-cell">
+            <span class="ancestor">AuthProvider — visibility change refresh</span>
+            <span class="test-title">does NOT call refreshToken when tab becomes hidden</span>
+            
+          </td>
+          <td class="test-duration">2ms</td>
+        </tr>
+        <tr class="test-row passed" data-suite="1">
+          <td class="test-status-cell"><span class="icon pass-icon">✓</span></td>
+          <td class="test-name-cell">
+            <span class="ancestor">AuthProvider — visibility change refresh</span>
+            <span class="test-title">does NOT call refreshToken when visible but user is null</span>
+            
+          </td>
+          <td class="test-duration">2ms</td>
+        </tr>
+        <tr class="test-row passed" data-suite="1">
+          <td class="test-status-cell"><span class="icon pass-icon">✓</span></td>
+          <td class="test-name-cell">
+            <span class="ancestor">useAuth() outside AuthProvider</span>
+            <span class="test-title">throws a descriptive error when used outside AuthProvider</span>
+            
+          </td>
+          <td class="test-duration">27ms</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  <footer class="footer">
+    <span>Generated by FlexSpace custom Jest reporter</span>
+    <span>Jest </span>
+  </footer>
+
+  <script>
+    let allExpanded = true;
+    let activeFilter = 'all';
+
+    function toggleSuite(idx) {
+      const tbody = document.getElementById('suite-' + idx);
+      const chev  = document.getElementById('chev-' + idx);
+      const rows  = tbody.querySelectorAll('.test-row');
+      const isHidden = rows.length > 0 && rows[0].style.display === 'none';
+      rows.forEach(r => r.style.display = isHidden ? '' : 'none');
+      chev.classList.toggle('collapsed', !isHidden);
+    }
+
+    function toggleAll() {
+      const btn = document.querySelector('.expand-all-btn');
+      allExpanded = !allExpanded;
+      document.querySelectorAll('.test-row').forEach(r => {
+        if (!r.classList.contains('hidden')) {
+          r.style.display = allExpanded ? '' : 'none';
+        }
+      });
+      document.querySelectorAll('.suite-chevron').forEach(c => {
+        c.classList.toggle('collapsed', !allExpanded);
+      });
+      btn.textContent = allExpanded ? 'Collapse all' : 'Expand all';
+    }
+
+    function filter(status, btn) {
+      activeFilter = status;
+      document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+
+      document.querySelectorAll('.test-row').forEach(r => {
+        if (status === 'all') {
+          r.classList.remove('hidden');
+          r.style.display = '';
+        } else {
+          const match = r.classList.contains(status);
+          r.classList.toggle('hidden', !match);
+          r.style.display = match ? '' : 'none';
+        }
+      });
+
+      // Hide suite headers where all tests are filtered out
+      document.querySelectorAll('.suite-group').forEach(tbody => {
+        const visibleTests = tbody.querySelectorAll('.test-row:not(.hidden)');
+        const header = tbody.querySelector('.suite-header');
+        if (header) header.style.display = visibleTests.length === 0 ? 'none' : '';
+      });
+    }
+
+    // Auto-expand failed suites on load, collapse passed ones if there are failures
+    window.addEventListener('DOMContentLoaded', () => {
+      const hasFailed = document.querySelectorAll('.test-row.failed').length > 0;
+      if (hasFailed) {
+        document.querySelectorAll('.suite-group').forEach((tbody, idx) => {
+          const hasSuiteFail = tbody.querySelectorAll('.test-row.failed').length > 0;
+          if (!hasSuiteFail) {
+            // collapse passing suites so failures are prominent
+            const rows = tbody.querySelectorAll('.test-row');
+            const chev = document.getElementById('chev-' + idx);
+            rows.forEach(r => r.style.display = 'none');
+            if (chev) chev.classList.add('collapsed');
+          }
+        });
+      }
+    });
+  </script>
+</body>
+</html>
