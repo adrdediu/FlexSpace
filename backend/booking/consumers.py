@@ -2,6 +2,7 @@ from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.exceptions import StopConsumer
 import redis.asyncio as aioredis
 import json
+import os
 
 
 class GlobalUpdatesConsumer(AsyncWebsocketConsumer):
@@ -11,8 +12,10 @@ class GlobalUpdatesConsumer(AsyncWebsocketConsumer):
             raise StopConsumer()
 
         try:
+            redis_host = os.getenv('REDIS_HOST', '127.0.0.1')
+            redis_port = os.getenv('REDIS_PORT', '6379')
             redis = await aioredis.from_url(
-                "redis://127.0.0.1:6378",
+                f"redis://{redis_host}:{redis_port}",
                 encoding="utf-8",
                 decode_responses=True,
             )
@@ -42,12 +45,6 @@ class GlobalUpdatesConsumer(AsyncWebsocketConsumer):
 
 
 class LocationConsumer(AsyncWebsocketConsumer):
-    """
-    Location-level WebSocket. Clients connect when they select a location in
-    the browser panel. Receives room-level broadcasts (maintenance, availability)
-    so the room list stays live without polling.
-    """
-
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.location_id = None
@@ -72,10 +69,6 @@ class LocationConsumer(AsyncWebsocketConsumer):
             pass
 
     async def room_maintenance(self, event):
-        """
-        Forwarded when a manager toggles maintenance on a room in this location.
-        event: { type, room_id, enabled, by }
-        """
         await self.send(text_data=json.dumps({
             "type": "room_maintenance",
             "room_id": event.get("room_id"),
@@ -84,10 +77,6 @@ class LocationConsumer(AsyncWebsocketConsumer):
         }))
 
     async def room_availability(self, event):
-        """
-        Forwarded when a room's available desk count changes.
-        event: { type, room_id, available_desk_count }
-        """
         await self.send(text_data=json.dumps({
             "type": "room_availability",
             "room_id": event.get("room_id"),
@@ -129,7 +118,6 @@ class RoomConsumer(AsyncWebsocketConsumer):
             await self.send(text_data=json.dumps({"type": "pong"}))
 
     async def desk_status(self, event):
-        """event: { type, desk_id, is_booked, booked_by }"""
         await self.send(text_data=json.dumps({
             "type": "desk_status",
             "desk_id": event.get("desk_id"),
@@ -138,7 +126,6 @@ class RoomConsumer(AsyncWebsocketConsumer):
         }))
 
     async def update_bookings(self, event):
-        """event: { type, desk_id, action, bookings, deleted_ids }"""
         await self.send(text_data=json.dumps({
             "type": "update_bookings",
             "desk_id": event.get("desk_id"),
@@ -148,7 +135,6 @@ class RoomConsumer(AsyncWebsocketConsumer):
         }))
 
     async def desk_lock(self, event):
-        """event: { type, desk_id, locked, by }"""
         await self.send(text_data=json.dumps({
             "type": "desk_lock",
             "desk_id": event.get("desk_id"),
@@ -157,7 +143,6 @@ class RoomConsumer(AsyncWebsocketConsumer):
         }))
 
     async def room_maintenance(self, event):
-        """event: { type, room_id, enabled, by }"""
         await self.send(text_data=json.dumps({
             "type": "room_maintenance",
             "room_id": event.get("room_id"),
@@ -166,7 +151,6 @@ class RoomConsumer(AsyncWebsocketConsumer):
         }))
 
     async def room_message(self, event):
-        """Generic passthrough. event: { type, data }"""
         await self.send(text_data=json.dumps(event.get("data", {})))
 
     async def disconnect(self, close_code):  # type: ignore
