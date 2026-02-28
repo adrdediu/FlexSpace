@@ -22,6 +22,7 @@ import {
 import {
   Home24Regular,
   CalendarLtr24Regular,
+  ClipboardBulletListLtr20Regular,
   Settings24Regular,
   PersonCircle24Regular,
   SignOut24Regular,
@@ -350,6 +351,21 @@ export const TopBar: React.FC<TopBarProps> = ({
               </Button>
             </Tooltip>
 
+            <Tooltip content="View Your Activity" relationship="description">
+              <Button
+                appearance={activeSection === 'activity' ? 'primary' : 'subtle'}
+                icon={<ClipboardBulletListLtr20Regular />}
+                onClick={() => handleNavClick('activity')}
+                disabled={loading}
+                className={mergeClasses(
+                  styles.navButton,
+                  activeSection === 'activity' && styles.navButtonActive
+                )}
+              >
+                My Activity
+              </Button>
+            </Tooltip>
+
             {isAdmin && (
               <Tooltip content="Admin Panel" relationship="description">
                 <Button
@@ -570,6 +586,16 @@ export const TopBar: React.FC<TopBarProps> = ({
               className={styles.drawerNavButton}
             >
               My Bookings
+            </Button>
+
+            <Button
+              appearance={activeSection === 'activity' ? 'primary' : 'subtle'}
+              icon={<ClipboardBulletListLtr20Regular />}
+              onClick={() => handleNavClick('activity')}
+              disabled={loading}
+              className={styles.drawerNavButton}
+            >
+              My Activity
             </Button>
 
             {isAdmin && (

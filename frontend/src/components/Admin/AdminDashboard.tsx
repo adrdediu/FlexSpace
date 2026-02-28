@@ -10,12 +10,14 @@ import {
   Door20Regular,
   People20Regular,
   Settings20Regular,
+  ClipboardBulletListLtr20Regular,
 } from '@fluentui/react-icons';
 import { FloatingPanelGrid, FloatingPanel } from '../Layout';
 import { LocationManagement } from './LocationManagement';
 import { RoomManagement } from './RoomManagement';
 import { UserGroupManagement } from './UserGroupManagement';
 import AdminSettings from './AdminSettings';
+import AuditLogViewer from './AuditLogViewer';
 
 const useStyles = makeStyles({
   tabsContainer: {
@@ -35,7 +37,7 @@ const useStyles = makeStyles({
   },
 });
 
-type AdminTab = 'locations' | 'rooms' | 'groups' | 'settings';
+type AdminTab = 'locations' | 'rooms' | 'groups' | 'settings' | 'audit';
 
 export interface AdminDashboardProps {
   /**
@@ -75,6 +77,10 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
     <AdminSettings/>
   );
 
+  const renderAuditTab = () => (
+    <AuditLogViewer />
+  );
+
   return (
     <FloatingPanelGrid>
       <FloatingPanel
@@ -100,6 +106,9 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             <Tab value="settings" icon={<Settings20Regular />}>
               Settings
             </Tab>
+            <Tab value="audit" icon={<ClipboardBulletListLtr20Regular />}>
+              Audit Log
+            </Tab>
           </TabList>
 
           <div className={styles.tabContent}>
@@ -107,6 +116,7 @@ export const AdminDashboard: React.FC<AdminDashboardProps> = ({
             {activeTab === 'rooms' && renderRoomsTab()}
             {activeTab === 'groups' && renderGroupsTab()}
             {activeTab === 'settings' && renderSettingsTab()}
+            {activeTab === 'audit' && renderAuditTab()}
           </div>
         </div>
       </FloatingPanel>

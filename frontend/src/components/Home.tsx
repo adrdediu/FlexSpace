@@ -8,6 +8,7 @@ import { StatusBar } from './StatusBar';
 import { FloatingPanelGrid, FloatingPanel } from './Layout';
 import { SettingsDialog, ProfileDialog } from './Common';
 import { AdminDashboard } from './Admin';
+import MyActivity from './Activity/MyActivity';
 import { type WsStatus, type NavSection } from '../types/common';
 import { type Desk, type Room } from './Dashboard/types';
 import { RoomMapViewer } from './Dashboard/RoomMapViewer';
@@ -283,46 +284,38 @@ const Home: React.FC<HomeProps> = ({ onMount }) => {
         />
       </FloatingPanel>
 
-      {/* Centre — Room map */}
-      <FloatingPanel
-        position="center"
-        size="custom"
-        opacity="glass"
-        noPadding={false}
-        style={{
-          left: '360px',
-          right: '360px',
-          top: '16px',
-          bottom: '16px',
-          width: 'auto',
-          height: 'calc(100% - 32px)',
-          transform: 'none',
-        }}
-      >
-        {loadingRoom ? (
-          <div style={{ display: 'flex', height: '100%', alignItems: 'center', justifyContent: 'center' }}>
-            <Spinner size="large" label="Loading room…" />
-          </div>
-        ) : selectedRoomData ? (
-          <RoomMapViewer
-            room={selectedRoomData}
-            onClose={() => { setSelectedRoomData(null); setPendingDeskId(null); setPendingEditBooking(null); }}
-            onBookingChange={handleBookingChange}
-            initialSelectedDeskId={pendingDeskId}
-            initialEditingBooking={pendingEditBooking}
-          />
-        ) : (
-          <div style={{
-            display: 'flex', flexDirection: 'column', alignItems: 'center',
-            justifyContent: 'center', height: '100%', gap: '12px',
-            color: 'var(--colorNeutralForeground3)', textAlign: 'center', padding: '24px',
-          }}>
-            <div style={{ fontSize: '48px' }}>🗺️</div>
-            <Text size={400} weight="semibold">Select a room to view its map</Text>
-            <Text size={200}>Browse locations and floors on the right, then click a room to start booking</Text>
-          </div>
-        )}
-      </FloatingPanel>
+      {/* Centre — Room map (only shown when a room is selected or loading) */}
+      {(loadingRoom || selectedRoomData) && (
+        <FloatingPanel
+          position="center"
+          size="custom"
+          opacity="glass"
+          noPadding={false}
+          style={{
+            left: '360px',
+            right: '360px',
+            top: '16px',
+            bottom: '16px',
+            width: 'auto',
+            height: 'calc(100% - 32px)',
+            transform: 'none',
+          }}
+        >
+          {loadingRoom ? (
+            <div style={{ display: 'flex', height: '100%', alignItems: 'center', justifyContent: 'center' }}>
+              <Spinner size="large" label="Loading room…" />
+            </div>
+          ) : (
+            <RoomMapViewer
+              room={selectedRoomData!}
+              onClose={() => { setSelectedRoomData(null); setPendingDeskId(null); setPendingEditBooking(null); }}
+              onBookingChange={handleBookingChange}
+              initialSelectedDeskId={pendingDeskId}
+              initialEditingBooking={pendingEditBooking}
+            />
+          )}
+        </FloatingPanel>
+      )}
 
       {/* Right — Location browser */}
       <FloatingPanel
@@ -367,6 +360,10 @@ const Home: React.FC<HomeProps> = ({ onMount }) => {
     </FloatingPanelGrid>
   );
 
+  const renderActivity = () => (
+    <MyActivity />
+  );
+
   const renderAdmin = () => (
     <AdminDashboard />
   );
@@ -386,6 +383,7 @@ const Home: React.FC<HomeProps> = ({ onMount }) => {
         {/* Globe background renders here from GlobalLayout */}
         {activeSection === 'dashboard' && renderDashboard()}
         {activeSection === 'bookings' && renderMyBookings()}
+        {activeSection === 'activity' && renderActivity()}
         {activeSection === 'admin' && renderAdmin()}
       </div>
 
