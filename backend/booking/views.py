@@ -30,6 +30,7 @@ from .serializers.location import LocationSerializer
 from .serializers.room import RoomSerializer, RoomListSerializer, RoomWithDesksSerializer
 
 import datetime
+from .models_audit import AuditLog
 
 class CountryViewSet(viewsets.ModelViewSet):
     queryset = Country.objects.all()
@@ -182,6 +183,23 @@ class DeskViewSet(viewsets.ModelViewSet):
         desk.full_clean()
         desk.save()
 
+        AuditLog.log(
+            user=request.user,
+            action=AuditLog.Action.DESK_ASSIGNED,
+            target_type='desk',
+            target_id=desk.id,
+            target_snapshot={
+                'desk': desk.name,
+                'desk_id': desk.id,
+                'room': desk.room.name,
+                'room_id': desk.room.id,
+                'location': desk.room.floor.location.name,
+                'location_id': desk.room.floor.location.id,
+                'assigned_to': assignee.username,
+            },
+            ip_address=request.META.get('REMOTE_ADDR'),
+        )
+
         serializer = self.get_serializer(desk)
         return Response(serializer.data)
 
@@ -199,9 +217,27 @@ class DeskViewSet(viewsets.ModelViewSet):
                 status=status.HTTP_403_FORBIDDEN
             )
 
+        prev_assignee = desk.permanent_assignee.username if desk.permanent_assignee else None
         desk.is_permanent = False
         desk.permanent_assignee = None
         desk.save()
+
+        AuditLog.log(
+            user=request.user,
+            action=AuditLog.Action.DESK_UNASSIGNED,
+            target_type='desk',
+            target_id=desk.id,
+            target_snapshot={
+                'desk': desk.name,
+                'desk_id': desk.id,
+                'room': desk.room.name,
+                'room_id': desk.room.id,
+                'location': desk.room.floor.location.name,
+                'location_id': desk.room.floor.location.id,
+                'was_assigned_to': prev_assignee,
+            },
+            ip_address=request.META.get('REMOTE_ADDR'),
+        )
 
         serializer = self.get_serializer(desk)
         return Response(serializer.data)
@@ -355,11 +391,26 @@ class BookingViewSet(viewsets.ModelViewSet):
 
         ok = acquire_lock(int(desk_id), request.user.id, request.user.username)
         if ok:
+            desk = Desk.objects.get(pk=desk_id)
             Desk.objects.filter(pk=desk_id).update(is_locked=True,locked_by=request.user)
-
+            AuditLog.log(
+                user=request.user,
+                action=AuditLog.Action.DESK_LOCKED,
+                target_type='desk',
+                target_id=int(desk_id),
+                target_snapshot={
+                    'desk': desk.name,
+                    'desk_id': desk.id,
+                    'room': desk.room.name,
+                    'room_id': desk.room.id,
+                    'location': desk.room.floor.location.name,
+                    'location_id': desk.room.floor.location.id,
+                },
+                ip_address=request.META.get('REMOTE_ADDR'),
+            )
             channel_layer=get_channel_layer()
             async_to_sync(channel_layer.group_send)(
-                f"room_{Desk.objects.get(pk=desk_id).room_id}",
+                f"room_{desk.room_id}",
                 {"type":"desk_lock","desk_id":int(desk_id),"locked":True, "by":request.user.username}
             )
             return Response({"ok":True}, status=200)
@@ -387,6 +438,21 @@ class BookingViewSet(viewsets.ModelViewSet):
         desk = Desk.objects.get(pk=desk_id)
         if desk.is_locked:
             Desk.objects.filter(pk=desk_id).update(is_locked=False, locked_by=None)
+            AuditLog.log(
+                user=request.user,
+                action=AuditLog.Action.DESK_UNLOCKED,
+                target_type='desk',
+                target_id=desk_id,
+                target_snapshot={
+                    'desk': desk.name,
+                    'desk_id': desk.id,
+                    'room': desk.room.name,
+                    'room_id': desk.room.id,
+                    'location': desk.room.floor.location.name,
+                    'location_id': desk.room.floor.location.id,
+                },
+                ip_address=request.META.get('REMOTE_ADDR'),
+            )
             channel_layer = get_channel_layer()
             async_to_sync(channel_layer.group_send)(
                 f"room_{desk.room_id}",
@@ -442,6 +508,26 @@ class BookingViewSet(viewsets.ModelViewSet):
             
             booking = serializer.save(user=self.request.user, desk=desk_locked)
 
+            AuditLog.log(
+                user=self.request.user,
+                action=AuditLog.Action.BOOKING_CREATED,
+                target_type='booking',
+                target_id=booking.id,
+                target_snapshot={
+                    'desk': desk_locked.name,
+                    'desk_id': desk_locked.id,
+                    'room': desk_locked.room.name,
+                    'room_id': desk_locked.room.id,
+                    'floor': desk_locked.room.floor.name,
+                    'floor_id': desk_locked.room.floor.id,
+                    'location': desk_locked.room.floor.location.name,
+                    'location_id': desk_locked.room.floor.location.id,
+                    'start_time': str(booking.start_time),
+                    'end_time': str(booking.end_time),
+                },
+                ip_address=self.request.META.get('REMOTE_ADDR'),
+            )
+
             desk_locked.refresh_booking_state()
             self._broadcast_desk_status(desk_locked)
 
@@ -453,6 +539,27 @@ class BookingViewSet(viewsets.ModelViewSet):
     def perform_destroy(self,instance):
         desk = instance.desk
         deleted_id = instance.id
+
+        AuditLog.log(
+            user=self.request.user,
+            action=AuditLog.Action.BOOKING_CANCELLED,
+            target_type='booking',
+            target_id=deleted_id,
+            target_snapshot={
+                'desk': desk.name,
+                'desk_id': desk.id,
+                'room': desk.room.name,
+                'room_id': desk.room.id,
+                'floor': desk.room.floor.name,
+                'floor_id': desk.room.floor.id,
+                'location': desk.room.floor.location.name,
+                'location_id': desk.room.floor.location.id,
+                'start_time': str(instance.start_time),
+                'end_time': str(instance.end_time),
+                'booked_by': instance.user.username,
+            },
+            ip_address=self.request.META.get('REMOTE_ADDR'),
+        )
         super().perform_destroy(instance)
 
         desk.refresh_booking_state()
@@ -649,6 +756,26 @@ class BookingViewSet(viewsets.ModelViewSet):
                 serializer.is_valid(raise_exception=True)
                 self.perform_update(serializer)
 
+                AuditLog.log(
+                    user=request.user,
+                    action=AuditLog.Action.BOOKING_UPDATED,
+                    target_type='booking',
+                    target_id=booking.id,
+                    target_snapshot={
+                        'desk': desk.name,
+                        'desk_id': desk.id,
+                        'room': desk.room.name,
+                        'room_id': desk.room.id,
+                        'floor': desk.room.floor.name,
+                        'floor_id': desk.room.floor.id,
+                        'location': desk.room.floor.location.name,
+                        'location_id': desk.room.floor.location.id,
+                        'start_time': str(s_dt),
+                        'end_time': str(e_dt),
+                    },
+                    ip_address=request.META.get('REMOTE_ADDR'),
+                )
+
                 desk_locked.refresh_booking_state()
                 self._broadcast_desk_status(desk_locked)
                 self._broadcast_update_bookings(desk_locked, upsert_qs=Booking.objects.filter(pk=booking.pk))
@@ -825,6 +952,21 @@ class UserLoginView(TokenObtainPairView):
         response = super().post(request, *args, **kwargs)
 
         if response.status_code == 200:
+            from django.contrib.auth import get_user_model
+            User = get_user_model()
+            try:
+                username = request.data.get('username', '')
+                login_user = User.objects.get(username=username)
+                AuditLog.log(
+                    user=login_user,
+                    action=AuditLog.Action.USER_LOGIN,
+                    target_type='user',
+                    target_id=login_user.id,
+                    target_snapshot={'username': username},
+                    ip_address=request.META.get('REMOTE_ADDR'),
+                )
+            except Exception:
+                pass
 
             if "access" in response.data:
                 access_token = response.data["access"]
@@ -869,6 +1011,15 @@ class UserLogoutView(generics.GenericAPIView):
                 print(f"Error blacklisting token: {e}")
                 pass
         
+        AuditLog.log(
+            user=request.user,
+            action=AuditLog.Action.USER_LOGOUT,
+            target_type='user',
+            target_id=request.user.id,
+            target_snapshot={'username': request.user.username},
+            ip_address=request.META.get('REMOTE_ADDR'),
+        )
+
         response.delete_cookie("access_token")
         response.delete_cookie("refresh_token")
 

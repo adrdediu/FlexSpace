@@ -10,6 +10,7 @@ from asgiref.sync import async_to_sync
 from channels.layers import get_channel_layer
 
 from ..models import Location, Room, Floor, UserGroup
+from ..models_audit import AuditLog
 from ..serializers.location import LocationSerializer, LocationListSerializer
 from ..serializers.room import RoomSerializer, RoomListSerializer, RoomWithDesksSerializer
 from ..permissions import IsLocationManager, IsRoomManager
@@ -445,10 +446,29 @@ class RoomManagementViewSet(viewsets.ModelViewSet):
         if not room.is_room_manager(request.user) and not request.user.is_superuser:
             return Response({'error': 'Only room managers can set maintenance mode'}, status=status.HTTP_403_FORBIDDEN)
 
+        if room.is_under_maintenance:
+            return Response({'is_under_maintenance': True, 'maintenance_by_name': room.maintenance_by_name})
+
         by = request.user.get_full_name() or request.user.username
         room.is_under_maintenance = True
         room.maintenance_by_name = by
         room.save(update_fields=['is_under_maintenance', 'maintenance_by_name'])
+
+        AuditLog.log(
+            user=request.user,
+            action=AuditLog.Action.ROOM_MAINTENANCE,
+            target_type='room',
+            target_id=room.id,
+            target_snapshot={
+                'room': room.name,
+                'room_id': room.id,
+                'location': room.floor.location.name,
+                'location_id': room.floor.location.id,
+                'maintenance': True,
+                'by': by,
+            },
+            ip_address=request.META.get('REMOTE_ADDR'),
+        )
 
         event = {'type': 'room_maintenance', 'room_id': room.id, 'enabled': True, 'by': by}
         channel_layer = get_channel_layer()
@@ -462,10 +482,29 @@ class RoomManagementViewSet(viewsets.ModelViewSet):
         if not room.is_room_manager(request.user) and not request.user.is_superuser:
             return Response({'error': 'Only room managers can clear maintenance mode'}, status=status.HTTP_403_FORBIDDEN)
 
+        if not room.is_under_maintenance:
+            return Response({'is_under_maintenance': False, 'maintenance_by_name': ''})
+
         by = request.user.get_full_name() or request.user.username
         room.is_under_maintenance = False
         room.maintenance_by_name = ''
         room.save(update_fields=['is_under_maintenance', 'maintenance_by_name'])
+
+        AuditLog.log(
+            user=request.user,
+            action=AuditLog.Action.ROOM_MAINTENANCE,
+            target_type='room',
+            target_id=room.id,
+            target_snapshot={
+                'room': room.name,
+                'room_id': room.id,
+                'location': room.floor.location.name,
+                'location_id': room.floor.location.id,
+                'maintenance': False,
+                'by': by,
+            },
+            ip_address=request.META.get('REMOTE_ADDR'),
+        )
 
         event = {'type': 'room_maintenance', 'room_id': room.id, 'enabled': False, 'by': by}
         channel_layer = get_channel_layer()

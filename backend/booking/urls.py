@@ -6,6 +6,7 @@ from django.urls import path,include
 from .views import CountryViewSet, LocationViewSet, FloorViewSet, RoomViewSet, DeskViewSet, BookingViewSet
 from .admin_views_module import UserGroupViewSet, LocationManagementViewSet, RoomManagementViewSet, UserSearchViewSet, UserPreferencesViewSet
 from .accounts.oauth_views import GoogleLoginView, GoogleCallbackView, LinkedAccountsView, DisconnectSocialAccountView, SetPasswordAfterOAuthView
+from .admin_views_module.audit_views import AuditLogViewSet
 
 router = routers.DefaultRouter()
 router.register(r'countries', CountryViewSet)
@@ -21,6 +22,7 @@ router.register(r'admin/locations', LocationManagementViewSet, basename='admin-l
 router.register(r'admin/rooms', RoomManagementViewSet, basename='admin-room')
 router.register(r'users', UserSearchViewSet, basename='user')
 router.register(r'preferences', UserPreferencesViewSet, basename='preferences')
+router.register(r'audit', AuditLogViewSet, basename='audit')
 
 urlpatterns = [
     path('auth/login/', UserLoginView.as_view(), name='login'),
