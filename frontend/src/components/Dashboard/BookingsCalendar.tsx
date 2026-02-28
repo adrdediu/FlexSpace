@@ -147,30 +147,34 @@ export function tzDateStr(iso: string, tz: string): string {
  * e.g. "2026-02-21" in "Europe/London" (GMT+1 in summer) → "2026-02-20T23:00:00.000Z"
  */
 function tzMidnightUTC(dateStr: string, tz: string): string {
-  // Parse the date components, then find what UTC instant is midnight in that timezone.
-  // We use the trick of constructing a local-time string and letting Intl resolve it.
+  // Find the UTC instant that corresponds to 00:00:00 on dateStr in the given timezone.
+  //
+  // Strategy: probe noon UTC on that date, format it in the target tz to find the
+  // local offset, then use that offset to compute midnight.
+  //
+  //   UTC offset = UTC noon (12:00:00) − local noon (lh:lm:ls)
+  //   midnight in UTC = Date.UTC(y,m,d, 0,0,0) + offsetSecs * 1000
+  //
+  // This avoids the previous bug where the offset was subtracted twice.
   try {
-    const [y, m, d] = dateStr.split('-').map(Number);
-    // Try each of the 48 possible UTC offsets to find which UTC time is midnight in tz.
-    // More directly: use Date.parse with a timezone-anchored string via the formatter round-trip.
-    // Reliable approach: format a known UTC time and compare.
-    // Fastest: use the DateTimeFormat offset.
-    const probe = new Date(`${dateStr}T12:00:00Z`); // noon UTC — safely within same calendar day in any tz
-    const probeStr = new Intl.DateTimeFormat('en-US', {
-      timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit',
-      hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false,
-    }).format(probe);
-    // probeStr gives us the local time in tz for noon UTC.
-    // Subtract the local hour offset to find midnight.
+    const [y, mo, d] = dateStr.split('-').map(Number);
+    const noon = new Date(Date.UTC(y, mo - 1, d, 12, 0, 0));
+
     const localParts = new Intl.DateTimeFormat('en-US', {
-      timeZone: tz, hour: 'numeric', minute: 'numeric', second: 'numeric', hour12: false,
-    }).formatToParts(probe);
-    const localH = Number(localParts.find(p => p.type === 'hour')?.value ?? 12);
-    const localM = Number(localParts.find(p => p.type === 'minute')?.value ?? 0);
-    const localS = Number(localParts.find(p => p.type === 'second')?.value ?? 0);
-    // Offset from midnight in seconds: (localH*3600 + localM*60 + localS)
-    const offsetMs = ((localH === 24 ? 0 : localH) * 3600 + localM * 60 + localS) * 1000;
-    const midnightUTC = new Date(probe.getTime() - offsetMs - 12 * 3600_000);
+      timeZone: tz,
+      hour: 'numeric', minute: 'numeric', second: 'numeric',
+      hour12: false,
+    }).formatToParts(noon);
+
+    const lh = Number(localParts.find(p => p.type === 'hour')?.value   ?? 12);
+    const lm = Number(localParts.find(p => p.type === 'minute')?.value ?? 0);
+    const ls = Number(localParts.find(p => p.type === 'second')?.value ?? 0);
+
+    // UTC offset in seconds: how many seconds ahead/behind UTC is this timezone
+    const localNoonSecs = (lh === 24 ? 0 : lh) * 3600 + lm * 60 + ls;
+    const offsetSecs    = 12 * 3600 - localNoonSecs; // UTC noon − local noon
+
+    const midnightUTC = new Date(Date.UTC(y, mo - 1, d, 0, 0, 0) + offsetSecs * 1000);
     return midnightUTC.toISOString();
   } catch {
     return `${dateStr}T00:00:00.000Z`;
@@ -1162,7 +1166,7 @@ export const CalendarGrid: React.FC<CalendarGridProps> = ({
                       >
                         <div className={`${s.eventTitle} ${!isOwn ? s.eventTitleOther : ''}`}>{booking.desk.name}</div>
                         <div className={`${s.eventMeta} ${!isOwn ? s.eventMetaOther : ''}`}>
-                          {fmt(booking.start_time)}–{fmt(booking.end_time)}
+                          {fmt(evtStart)}–{fmt(evtEnd)}
                         </div>
                         {!isOwn && !clickMode && (
                           <div className={`${s.eventMeta} ${s.eventMetaOther}`}>{booking.username}</div>
